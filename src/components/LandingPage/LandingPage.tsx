@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import './LandingPage.css';
 
 const LandingPage: React.FC = () => {
@@ -50,14 +50,16 @@ const LandingPage: React.FC = () => {
     navLinks.forEach(link => {
       link.addEventListener('click', function(e) {
         e.preventDefault();
-        const targetId = (e.target as HTMLAnchorElement).getAttribute('href');
-        const targetSection = document.querySelector(targetId!);
-        
-        if (targetSection) {
-          targetSection.scrollIntoView({
-            behavior: 'smooth',
-            block: 'start'
-          });
+        const targetId = (e.currentTarget as HTMLAnchorElement).getAttribute('href');
+        if (targetId) {
+          const targetSection = document.querySelector(targetId);
+          
+          if (targetSection) {
+            targetSection.scrollIntoView({
+              behavior: 'smooth',
+              block: 'start'
+            });
+          }
         }
         setIsNavMenuActive(false);
       });

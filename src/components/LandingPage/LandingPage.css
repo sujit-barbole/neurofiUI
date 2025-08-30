@@ -294,37 +294,36 @@ body, html {
     animation: fadeInUp 1s ease 0.8s both;
 }
 
-.stat-item {
+.hero-stats .stat-item {
     text-align: center;
-    background: rgba(255, 255, 255, 0.15);
+    background: rgba(0, 0, 0, 0.3);
     padding: 1rem 1.5rem;
     border-radius: 8px;
     backdrop-filter: blur(10px);
-    border: 2px solid rgba(255, 255, 255, 0.3);
+    border: 2px solid rgba(255, 255, 255, 0.4);
     min-width: 120px;
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.4);
     transition: all 0.3s ease;
     cursor: pointer;
 }
 
-.stat-item:hover {
-    background: rgba(255, 255, 255, 0.25);
-    border-color: rgba(255, 255, 255, 0.5);
+.hero-stats .stat-item:hover {
+    background: rgba(0, 0, 0, 0.5);
+    border-color: rgba(255, 255, 255, 0.6);
     transform: translateY(-2px);
-    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.3);
+    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.6);
 }
 
-.stat-number {
+.hero-stats .stat-number {
     display: block;
     font-size: 1.8rem;
-    font-weight: 700;
-    color: #ffd700 !important;
-    margin-bottom: 0.25rem;
-    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
     font-weight: 800;
+    color: #ffffff !important;
+    margin-bottom: 0.25rem;
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.8);
 }
 
-.stat-label {
+.hero-stats .stat-label {
     font-size: 0.9rem;
     color: #ffffff !important;
     font-weight: 600;

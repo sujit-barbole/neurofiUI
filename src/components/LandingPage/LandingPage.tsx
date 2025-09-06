@@ -3,7 +3,6 @@ import './LandingPage.css';
 
 const LandingPage: React.FC = () => {
   const [isNavMenuActive, setIsNavMenuActive] = useState(false);
-  const [chatMessage, setChatMessage] = useState('');
   const [chatMessages, setChatMessages] = useState([
     {
       id: 1,
@@ -13,47 +12,95 @@ const LandingPage: React.FC = () => {
     }
   ]);
   const [activeSection, setActiveSection] = useState('home');
+  const [showPredefinedQuestions, setShowPredefinedQuestions] = useState(true);
+
+  // Predefined questions and answers
+  const predefinedQuestions = [
+    {
+      id: 1,
+      question: "Give me acomprehensive financial health check, including my financial confidence score and runway calculation",
+      answer: "Starting your investment journey is exciting! Here's a step-by-step approach:\n\n1. **Set Clear Goals**: Define what you're investing for (retirement, house, education)\n2. **Build an Emergency Fund**: Save 3-6 months of expenses first\n3. **Start Small**: Begin with low-cost index funds or ETFs\n4. **Diversify**: Don't put all your money in one place\n5. **Stay Consistent**: Regular contributions work better than timing the market\n\nWould you like me to help you create a personalized investment plan?"
+    },
+    {
+      id: 2,
+      question: "What's the best retirement strategy?",
+      answer: "A solid retirement strategy depends on your age and goals, but here are key principles:\n\n**For Young Investors (20s-30s):**\n• Start early - time is your biggest advantage\n• Aim for 10-15% of income in retirement accounts\n• Consider Roth IRA for tax-free growth\n\n**For Mid-Career (40s-50s):**\n• Maximize employer 401(k) matching\n• Consider catch-up contributions\n• Review and rebalance annually\n\n**General Tips:**\n• Use the 4% withdrawal rule in retirement\n• Consider healthcare costs\n• Plan for multiple income sources\n\nWhat's your current age and retirement timeline?"
+    },
+    {
+      id: 3,
+      question: "How much should I save each month?",
+      answer: "The amount depends on your goals, but here are some guidelines:\n\n**Emergency Fund:** 3-6 months of expenses\n**Retirement:** 10-15% of gross income\n**General Savings:** 20% of take-home pay (50/30/20 rule)\n\n**50/30/20 Rule:**\n• 50% for needs (housing, food, utilities)\n• 30% for wants (entertainment, dining)\n• 20% for savings and debt repayment\n\n**Quick Calculation:**\nIf you earn $5,000/month:\n• Emergency fund: $15,000-$30,000\n• Retirement: $500-$750/month\n• General savings: $1,000/month\n\nWhat's your monthly income and current expenses?"
+    },
+    {
+      id: 4,
+      question: "What's the difference between stocks and bonds?",
+      answer: "Great question! Here's a simple breakdown:\n\n**Stocks (Equities):**\n• You own a piece of a company\n• Higher potential returns (8-10% historically)\n• Higher risk and volatility\n• Best for long-term growth (5+ years)\n\n**Bonds (Fixed Income):**\n• You're lending money to a company/government\n• Lower, more predictable returns (2-4% typically)\n• Lower risk and more stable\n• Good for income and stability\n\n**Key Differences:**\n• Risk: Stocks > Bonds\n• Returns: Stocks > Bonds\n• Volatility: Stocks > Bonds\n• Income: Bonds provide regular interest\n\n**Rule of Thumb:**\n• Young investors: 80% stocks, 20% bonds\n• Near retirement: 60% stocks, 40% bonds\n\nWhat's your risk tolerance and investment timeline?"
+    },
+    {
+      id: 5,
+      question: "How do I build good credit?",
+      answer: "Building good credit takes time and discipline. Here's how:\n\n**Essential Steps:**\n1. **Pay Bills On Time**: This is 35% of your credit score\n2. **Keep Credit Utilization Low**: Use less than 30% of available credit\n3. **Don't Close Old Accounts**: Length of credit history matters\n4. **Mix of Credit Types**: Credit cards, loans, mortgages\n5. **Check Your Credit Report**: Monitor for errors\n\n**Quick Wins:**\n• Set up automatic payments\n• Request credit limit increases\n• Become an authorized user on someone's account\n• Use credit cards for small purchases and pay off monthly\n\n**Timeline:**\n• 6 months: Start seeing improvements\n• 1-2 years: Significant score increase\n• 3+ years: Excellent credit possible\n\nWhat's your current credit situation?"
+    },
+    {
+      id: 6,
+      question: "Should I pay off debt or invest?",
+      answer: "This depends on your debt's interest rate. Here's the decision framework:\n\n**Pay Off Debt First If:**\n• Interest rate > 6-7%\n• High-interest credit cards (15-25%)\n• Personal loans (8-15%)\n• You're stressed about debt\n\n**Invest First If:**\n• Low-interest debt (< 4-5%)\n• Mortgage rates (3-4%)\n• Student loans (3-6%)\n• You have employer 401(k) matching\n\n**Hybrid Approach:**\n• Pay minimums on low-interest debt\n• Invest in 401(k) up to employer match\n• Aggressively pay high-interest debt\n• Then increase investments\n\n**Example:**\nIf you have $10,000 at 20% interest vs. investing at 8% return, paying debt saves you $1,200 more per year!\n\nWhat types of debt do you have and their interest rates?"
+    }
+  ];
+
+  // Modal state
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [modalTitle, setModalTitle] = useState('');
+  const [modalDescription, setModalDescription] = useState('');
 
   const toggleNavMenu = () => {
     setIsNavMenuActive(!isNavMenuActive);
   };
 
-  const handleChatSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (chatMessage.trim()) {
-      const newMessage = {
-        id: chatMessages.length + 1,
-        type: 'user' as const,
-        content: chatMessage,
+
+  const handlePredefinedQuestion = (question: string, answer: string) => {
+    // Add user question to chat
+    const userMessage = {
+      id: chatMessages.length + 1,
+      type: 'user' as const,
+      content: question,
+      time: 'Just now'
+    };
+    
+    // Add bot answer to chat
+    const botMessage = {
+      id: chatMessages.length + 2,
+      type: 'bot' as const,
+      content: answer,
+      time: 'Just now'
+    };
+
+    setChatMessages(prev => [...prev, userMessage, botMessage]);
+    // Keep predefined questions visible after answer
+  };
+
+  const resetChat = () => {
+    setChatMessages([
+      {
+        id: 1,
+        type: 'bot',
+        content: "Hello! I'm your AI financial assistant. How can I help you today?",
         time: 'Just now'
-      };
-      setChatMessages([...chatMessages, newMessage]);
-      setChatMessage('');
-      
-      // Simulate bot response
-      setTimeout(() => {
-        const botResponse = {
-          id: chatMessages.length + 2,
-          type: 'bot' as const,
-          content: "Thank you for your message! I'm here to help with your financial questions.",
-          time: 'Just now'
-        };
-        setChatMessages(prev => [...prev, botResponse]);
-      }, 1000);
-    }
+      }
+    ]);
+    setShowPredefinedQuestions(true);
   };
 
   useEffect(() => {
     // Smooth scrolling for navigation links
     const navLinks = document.querySelectorAll('.nav-link[href^="#"]');
-    
+
     navLinks.forEach(link => {
-      link.addEventListener('click', function(e) {
+      link.addEventListener('click', function (e) {
         e.preventDefault();
         const targetId = (e.currentTarget as HTMLAnchorElement).getAttribute('href');
         if (targetId) {
           const targetSection = document.querySelector(targetId);
-          
           if (targetSection) {
             targetSection.scrollIntoView({
               behavior: 'smooth',
@@ -65,7 +112,7 @@ const LandingPage: React.FC = () => {
       });
     });
 
-    // Header background change on scroll
+    // Header background change on scroll + section highlight
     const handleScroll = () => {
       const navbar = document.querySelector('.navbar') as HTMLElement;
       if (navbar) {
@@ -94,6 +141,19 @@ const LandingPage: React.FC = () => {
     };
   }, []);
 
+  // Handle service item click
+  const handleServiceClick = (title: string, description: string) => {
+    setModalTitle(title);
+    setModalDescription(description);
+    setIsModalOpen(true);
+  };
+
+  const closeModal = () => {
+    setIsModalOpen(false);
+    setModalTitle('');
+    setModalDescription('');
+  };
+
   return (
     <div className="landing-page">
       {/* Navigation */}
@@ -119,30 +179,6 @@ const LandingPage: React.FC = () => {
         </div>
       </nav>
 
-      {/* Trust Badges */}
-      <div className="trust-badges">
-        <div className="container">
-          <div className="trust-badges-content">
-            <div className="trust-badge">
-              <span className="badge-icon">🔒</span>
-              <span className="badge-text">SOC 2 Certified</span>
-            </div>
-            <div className="trust-badge">
-              <span className="badge-icon">🏦</span>
-              <span className="badge-text">FDIC Insured</span>
-            </div>
-            <div className="trust-badge">
-              <span className="badge-icon">🛡️</span>
-              <span className="badge-text">256-bit Encryption</span>
-            </div>
-            <div className="trust-badge">
-              <span className="badge-icon">✅</span>
-              <span className="badge-text">15+ Years Experience</span>
-            </div>
-          </div>
-        </div>
-      </div>
-
       {/* Hero Section */}
       <section id="home" className="hero">
         <div className="hero-container">
@@ -156,20 +192,6 @@ const LandingPage: React.FC = () => {
             <div className="hero-buttons">
               <a href="#ai-chatbot" className="btn btn-primary">Try AI Chatbot</a>
               <a href="#expert-advisory" className="btn btn-secondary">Expert Advisory</a>
-            </div>
-            <div className="hero-stats">
-              <div className="stat-item">
-                <span className="stat-number">50,000+</span>
-                <span className="stat-label">Happy Users</span>
-              </div>
-              <div className="stat-item">
-                <span className="stat-number">$2B+</span>
-                <span className="stat-label">Assets Managed</span>
-              </div>
-              <div className="stat-item">
-                <span className="stat-number">4.9/5</span>
-                <span className="stat-label">User Rating</span>
-              </div>
             </div>
           </div>
           <div className="hero-visual">
@@ -254,7 +276,7 @@ const LandingPage: React.FC = () => {
                   <span>✓</span> Market insights
                 </div>
               </div>
-              <a href="#contact" className="btn btn-primary">Try AI Chatbot Demo</a>
+              <a href="#contact" className="btn btn-primary">Experience the AI in Action</a>
             </div>
             <div className="chat-interface">
               <div className="chat-header">
@@ -263,6 +285,9 @@ const LandingPage: React.FC = () => {
                   <h4>NeuroFi AI Assistant</h4>
                   <span className="status">Online</span>
                 </div>
+                <button className="chat-reset" onClick={resetChat} title="Start New Conversation">
+                  🔄
+                </button>
               </div>
               <div className="chat-messages">
                 {chatMessages.map(message => (
@@ -271,16 +296,28 @@ const LandingPage: React.FC = () => {
                     <div className="message-time">{message.time}</div>
                   </div>
                 ))}
+                
+                {/* Predefined Questions */}
+                {showPredefinedQuestions && (
+                  <div className="predefined-questions">
+                    <div className="questions-header">
+                      <span>💡 Quick Questions</span>
+                    </div>
+                    <div className="questions-grid">
+                      {predefinedQuestions.map(q => (
+                        <button
+                          key={q.id}
+                          className="question-button"
+                          onClick={() => handlePredefinedQuestion(q.question, q.answer)}
+                        >
+                          {q.question}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
-              <form className="chat-input" onSubmit={handleChatSubmit}>
-                <input
-                  type="text"
-                  placeholder="Ask me anything about finance..."
-                  value={chatMessage}
-                  onChange={(e) => setChatMessage(e.target.value)}
-                />
-                <button type="submit">Send</button>
-              </form>
+              {/* Text input removed - using predefined questions only */}
             </div>
           </div>
         </div>
@@ -296,58 +333,50 @@ const LandingPage: React.FC = () => {
           <div className="advisory-content">
             <div className="advisory-text">
               <div className="advisory-services">
-                <div className="service-item">
+                <div className="service-item" onClick={() => handleServiceClick("Investment Planning", "Strategic investment advice tailored to your goals and risk tolerance.")}>
                   <div className="service-icon">📈</div>
                   <div className="service-content">
                     <h4>Investment Planning</h4>
-                    <p>Strategic investment advice tailored to your goals and risk tolerance.</p>
                   </div>
                 </div>
-                <div className="service-item">
+                <div className="service-item" onClick={() => handleServiceClick("Retirement Planning", "Comprehensive retirement strategies to secure your financial future.")}>
                   <div className="service-icon">🏖️</div>
                   <div className="service-content">
                     <h4>Retirement Planning</h4>
-                    <p>Comprehensive retirement strategies to secure your financial future.</p>
-                  </div>
+                   </div>
                 </div>
-                <div className="service-item">
+                <div className="service-item" onClick={() => handleServiceClick("Risk Management", "Protect your wealth with expert risk assessment and mitigation strategies.")}>
                   <div className="service-icon">🛡️</div>
                   <div className="service-content">
                     <h4>Risk Management</h4>
-                    <p>Protect your wealth with expert risk assessment and mitigation strategies.</p>
-                  </div>
+                   </div>
                 </div>
-                <div className="service-item">
+                <div className="service-item" onClick={() => handleServiceClick("Tax Optimization", "Minimize tax liability and maximize your wealth with smart tax strategies.")}>
                   <div className="service-icon">💰</div>
                   <div className="service-content">
                     <h4>Tax Optimization</h4>
-                    <p>Minimize tax liability and maximize your wealth with smart tax strategies.</p>
-                  </div>
+                 </div>
                 </div>
               </div>
               <a href="#contact" className="btn btn-primary">Schedule Free Consultation</a>
-            </div>
-            <div className="advisor-card">
-              <div className="advisor-avatar">👩‍💼</div>
-              <h4>Sarah Johnson</h4>
-              <p>Certified Financial Planner</p>
-              <div className="advisor-stats">
-                <div className="stat">
-                  <span className="stat-number">15+</span>
-                  <span className="stat-label">Years Experience</span>
-                </div>
-                <div className="stat">
-                  <span className="stat-number">500+</span>
-                  <span className="stat-label">Happy Clients</span>
-                </div>
-              </div>
             </div>
           </div>
         </div>
       </section>
 
+      {/* Modal */}
+      {isModalOpen && (
+        <div className="modal-overlay" onClick={closeModal}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            <button className="modal-close" onClick={closeModal}>×</button>
+            <h3>{modalTitle}</h3>
+            <p>{modalDescription}</p>
+          </div>
+        </div>
+      )}
+
       {/* Testimonials Section */}
-      <section id="testimonials" className="testimonials">
+      {/* <section id="testimonials" className="testimonials">
         <div className="container">
           <div className="section-header">
             <h2>What Our Clients Say</h2>
@@ -395,10 +424,10 @@ const LandingPage: React.FC = () => {
             </div>
           </div>
         </div>
-      </section>
+      </section> */}
 
       {/* Pricing Section */}
-      <section id="pricing" className="pricing">
+      {/* <section id="pricing" className="pricing">
         <div className="container">
           <div className="section-header">
             <h2>Choose Your Plan</h2>
@@ -465,7 +494,7 @@ const LandingPage: React.FC = () => {
             </div>
           </div>
         </div>
-      </section>
+      </section> */}
 
       {/* Contact Section */}
       <section id="contact" className="contact">
@@ -481,21 +510,21 @@ const LandingPage: React.FC = () => {
                   <span>📧</span>
                   <div>
                     <h4>Email</h4>
-                    <p>hello@neurofi.com</p>
+                    <p>Info@neurofi.in</p>
                   </div>
                 </div>
                 <div className="contact-item">
                   <span>📞</span>
                   <div>
                     <h4>Phone</h4>
-                    <p>+1 (555) 123-4567</p>
+                    <p>+91-9113662144</p>
                   </div>
                 </div>
                 <div className="contact-item">
                   <span>🏢</span>
                   <div>
                     <h4>Office</h4>
-                    <p>123 Financial District, San Francisco, CA 94105</p>
+                    <p>Neurofi HQ, HSR layout, sector 1, Bengalore,560102</p>
                   </div>
                 </div>
               </div>
@@ -533,11 +562,9 @@ const LandingPage: React.FC = () => {
               <ul>
                 <li><a href="#ai-chatbot">AI Chatbot</a></li>
                 <li><a href="#expert-advisory">Expert Advisory</a></li>
-                <li><a href="#pricing">Pricing</a></li>
-                <li><a href="#contact">API</a></li>
               </ul>
             </div>
-            <div className="footer-section">
+            {/* <div className="footer-section">
               <h4>Company</h4>
               <ul>
                 <li><a href="#about">About Us</a></li>
@@ -554,7 +581,7 @@ const LandingPage: React.FC = () => {
                 <li><a href="#privacy">Privacy Policy</a></li>
                 <li><a href="#terms">Terms of Service</a></li>
               </ul>
-            </div>
+            </div> */}
           </div>
           <div className="footer-bottom">
             <p>© 2024 NeuroFi. All rights reserved.</p>

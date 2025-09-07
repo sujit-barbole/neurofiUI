@@ -848,6 +848,7 @@ body, html {
     font-weight: 700;
     margin-bottom: 1rem;
     color: #333;
+    text-align: center;
 }
 
 .contact-info p {
@@ -855,18 +856,23 @@ body, html {
     color: #666;
     margin-bottom: 2rem;
     line-height: 1.6;
+    text-align: center;
 }
 
 .contact-details {
     display: flex;
     flex-direction: column;
     gap: 1.5rem;
+    align-items: center;
+    text-align: center;
 }
 
 .contact-item {
     display: flex;
     align-items: center;
     gap: 1rem;
+    justify-content: center;
+    width: 100%;
 }
 
 .contact-item i {
@@ -886,11 +892,13 @@ body, html {
     font-weight: 600;
     margin-bottom: 0.25rem;
     color: #333;
+    text-align: center;
 }
 
 .contact-item p {
     color: #666;
     margin: 0;
+    text-align: center;
 }
 
 /* Contact Form */

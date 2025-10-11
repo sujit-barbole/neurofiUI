@@ -53,6 +53,10 @@ const LandingPage: React.FC = () => {
   const [modalTitle, setModalTitle] = useState('');
   const [modalDescription, setModalDescription] = useState('');
 
+  // Notification state
+  const [showNotification, setShowNotification] = useState(false);
+  const [notificationMessage, setNotificationMessage] = useState('');
+
   const toggleNavMenu = () => {
     setIsNavMenuActive(!isNavMenuActive);
   };
@@ -115,11 +119,67 @@ const LandingPage: React.FC = () => {
     // Header background change on scroll + section highlight
     const handleScroll = () => {
       const navbar = document.querySelector('.navbar') as HTMLElement;
+      const navLinks = document.querySelectorAll('.nav-link') as NodeListOf<HTMLElement>;
+      const navLogo = document.querySelector('.nav-logo h2') as HTMLElement;
+      const navBars = document.querySelectorAll('.bar') as NodeListOf<HTMLElement>;
+      
       if (navbar) {
         if (window.scrollY > 100) {
-          navbar.style.background = 'rgba(255, 255, 255, 0.98)';
+          // Dark theme when scrolled
+          navbar.style.background = 'rgba(0, 0, 0, 0.95)';
+          navbar.style.borderBottomColor = 'rgba(255, 255, 255, 0.1)';
+          
+          // Update logo to white gradient
+          if (navLogo) {
+            navLogo.style.background = 'linear-gradient(135deg, #ffffff 0%, #a0a0a0 100%)';
+            navLogo.style.webkitBackgroundClip = 'text';
+            navLogo.style.webkitTextFillColor = 'transparent';
+            navLogo.style.backgroundClip = 'text';
+          }
+          
+          // Update nav links to white
+          navLinks.forEach(link => {
+            link.style.color = 'rgba(255, 255, 255, 0.8)';
+            link.addEventListener('mouseenter', () => {
+              link.style.color = '#ffffff';
+            });
+            link.addEventListener('mouseleave', () => {
+              link.style.color = 'rgba(255, 255, 255, 0.8)';
+            });
+          });
+          
+          // Update hamburger bars to white
+          navBars.forEach(bar => {
+            bar.style.background = '#ffffff';
+          });
         } else {
+          // Light theme when at top
           navbar.style.background = 'rgba(255, 255, 255, 0.95)';
+          navbar.style.borderBottomColor = 'rgba(0, 0, 0, 0.1)';
+          
+          // Update logo to black gradient
+          if (navLogo) {
+            navLogo.style.background = 'linear-gradient(135deg, #000000 0%, #333333 100%)';
+            navLogo.style.webkitBackgroundClip = 'text';
+            navLogo.style.webkitTextFillColor = 'transparent';
+            navLogo.style.backgroundClip = 'text';
+          }
+          
+          // Update nav links to black
+          navLinks.forEach(link => {
+            link.style.color = 'rgba(0, 0, 0, 0.8)';
+            link.addEventListener('mouseenter', () => {
+              link.style.color = '#000000';
+            });
+            link.addEventListener('mouseleave', () => {
+              link.style.color = 'rgba(0, 0, 0, 0.8)';
+            });
+          });
+          
+          // Update hamburger bars to black
+          navBars.forEach(bar => {
+            bar.style.background = '#000000';
+          });
         }
       }
 
@@ -154,6 +214,27 @@ const LandingPage: React.FC = () => {
     setModalDescription('');
   };
 
+  // Show notification function
+  const showMessageNotification = () => {
+    setNotificationMessage('🎉 Thank you! We have received your message and will get back to you soon.');
+    setShowNotification(true);
+    
+    // Auto hide after 4 seconds
+    setTimeout(() => {
+      setShowNotification(false);
+    }, 4000);
+  };
+
+  // Handle form submission
+  const handleFormSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    showMessageNotification();
+    
+    // Reset form
+    const form = e.target as HTMLFormElement;
+    form.reset();
+  };
+
   return (
     <div className="landing-page">
       {/* Navigation */}
@@ -167,8 +248,6 @@ const LandingPage: React.FC = () => {
             <li><a href="#features" className={`nav-link ${activeSection === 'features' ? 'active' : ''}`}>Features</a></li>
             <li><a href="#ai-chatbot" className={`nav-link ${activeSection === 'ai-chatbot' ? 'active' : ''}`}>AI Chatbot</a></li>
             <li><a href="#expert-advisory" className={`nav-link ${activeSection === 'expert-advisory' ? 'active' : ''}`}>Expert Advisory</a></li>
-            <li><a href="#testimonials" className={`nav-link ${activeSection === 'testimonials' ? 'active' : ''}`}>Testimonials</a></li>
-            <li><a href="#pricing" className={`nav-link ${activeSection === 'pricing' ? 'active' : ''}`}>Pricing</a></li>
             <li><a href="#contact" className={`nav-link ${activeSection === 'contact' ? 'active' : ''}`}>Contact</a></li>
           </ul>
           <div className="nav-toggle" onClick={toggleNavMenu}>
@@ -204,6 +283,62 @@ const LandingPage: React.FC = () => {
             <div className="floating-card card-3">
               <span>🔒</span> Secure
             </div>
+          </div>
+        </div>
+        
+        {/* Left Side Animations */}
+        <div className="hero-animations-left">
+          <div className="floating-element element-1">
+            <span>💰</span>
+          </div>
+          <div className="floating-element element-2">
+            <span>📈</span>
+          </div>
+          <div className="floating-element element-3">
+            <span>🎯</span>
+          </div>
+          <div className="floating-element element-4">
+            <span>⚡</span>
+          </div>
+          <div className="floating-element element-9">
+            <span>💳</span>
+          </div>
+          <div className="floating-element element-10">
+            <span>🏆</span>
+          </div>
+          <div className="floating-element element-11">
+            <span>📊</span>
+          </div>
+          <div className="floating-element element-12">
+            <span>🔐</span>
+          </div>
+        </div>
+
+        {/* Right Side Animations */}
+        <div className="hero-animations-right">
+          <div className="floating-element element-5">
+            <span>🔮</span>
+          </div>
+          <div className="floating-element element-6">
+            <span>💎</span>
+          </div>
+          <div className="floating-element element-7">
+            <span>🚀</span>
+          </div>
+          <div className="floating-element element-8">
+            <span>⭐</span>
+          </div>
+          <div className="floating-element element-13">
+            <span>🎨</span>
+          </div>
+          <div className="floating-element element-14">
+            <span>🌟</span>
+          </div>
+          <div className="floating-element element-15">
+            <span>💡</span>
+          </div>
+          <div className="floating-element element-16">
+            <span>🔔</span>
           </div>
         </div>
       </section>
@@ -530,17 +665,17 @@ const LandingPage: React.FC = () => {
               </div>
             </div>
             <div className="contact-form">
-              <form>
+              <form onSubmit={handleFormSubmit}>
                 <div className="form-group">
-                  <select>
-                    <option>Select Service</option>
-                    <option>AI Chatbot</option>
-                    <option>Expert Advisory</option>
-                    <option>Both Services</option>
+                  <select name="service" required>
+                    <option value="">Select Service</option>
+                    <option value="ai-chatbot">AI Chatbot</option>
+                    <option value="expert-advisory">Expert Advisory</option>
+                    <option value="both-services">Both Services</option>
                   </select>
                 </div>
                 <div className="form-group">
-                  <textarea placeholder="Send Message"></textarea>
+                  <textarea name="message" placeholder="Send Message" required></textarea>
                 </div>
                 <button type="submit" className="btn btn-primary">Send Message</button>
               </form>
@@ -548,6 +683,22 @@ const LandingPage: React.FC = () => {
           </div>
         </div>
       </section>
+
+      {/* Notification */}
+      {showNotification && (
+        <div className="notification-overlay">
+          <div className="notification">
+            <div className="notification-icon">✓</div>
+            <div className="notification-content">
+              <h4>Message Sent!</h4>
+              <p>{notificationMessage}</p>
+            </div>
+            <button className="notification-close" onClick={() => setShowNotification(false)}>
+              ×
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Footer */}
       <footer className="footer">

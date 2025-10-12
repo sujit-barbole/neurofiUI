@@ -96,6 +96,19 @@ const LandingPage: React.FC = () => {
   };
 
   useEffect(() => {
+    // Performance optimization for mobile animations
+    const isMobile = window.innerWidth <= 768;
+    const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    
+    if (isMobile && !prefersReducedMotion) {
+      // Enable hardware acceleration for mobile animations
+      const animatedElements = document.querySelectorAll('.floating-element, .floating-card');
+      animatedElements.forEach(el => {
+        (el as HTMLElement).style.transform = 'translate3d(0, 0, 0)';
+        (el as HTMLElement).style.willChange = 'transform';
+      });
+    }
+
     // Smooth scrolling for navigation links
     const navLinks = document.querySelectorAll('.nav-link[href^="#"]');
 

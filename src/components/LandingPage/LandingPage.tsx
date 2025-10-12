@@ -138,63 +138,28 @@ const LandingPage: React.FC = () => {
       
       if (navbar) {
         if (window.scrollY > 100) {
-          // Dark theme when scrolled
-          navbar.style.background = 'rgba(0, 0, 0, 0.95)';
-          navbar.style.borderBottomColor = 'rgba(255, 255, 255, 0.1)';
-          
-          // Update logo to white gradient
-          if (navLogo) {
-            navLogo.style.background = 'linear-gradient(135deg, #ffffff 0%, #a0a0a0 100%)';
-            navLogo.style.webkitBackgroundClip = 'text';
-            navLogo.style.webkitTextFillColor = 'transparent';
-            navLogo.style.backgroundClip = 'text';
-          }
-          
-          // Update nav links to white
-          navLinks.forEach(link => {
-            link.style.color = 'rgba(255, 255, 255, 0.8)';
-            link.addEventListener('mouseenter', () => {
-              link.style.color = '#ffffff';
-            });
-            link.addEventListener('mouseleave', () => {
-              link.style.color = 'rgba(255, 255, 255, 0.8)';
-            });
-          });
-          
-          // Update hamburger bars to white
-          navBars.forEach(bar => {
-            bar.style.background = '#ffffff';
-          });
+          // REMOVE or COMMENT this entire block
         } else {
-          // Light theme when at top
+          // KEEP only this part below
           navbar.style.background = 'rgba(255, 255, 255, 0.95)';
           navbar.style.borderBottomColor = 'rgba(0, 0, 0, 0.1)';
-          
-          // Update logo to black gradient
+      
           if (navLogo) {
             navLogo.style.background = 'linear-gradient(135deg, #000000 0%, #333333 100%)';
             navLogo.style.webkitBackgroundClip = 'text';
             navLogo.style.webkitTextFillColor = 'transparent';
             navLogo.style.backgroundClip = 'text';
           }
-          
-          // Update nav links to black
+      
           navLinks.forEach(link => {
             link.style.color = 'rgba(0, 0, 0, 0.8)';
-            link.addEventListener('mouseenter', () => {
-              link.style.color = '#000000';
-            });
-            link.addEventListener('mouseleave', () => {
-              link.style.color = 'rgba(0, 0, 0, 0.8)';
-            });
           });
-          
-          // Update hamburger bars to black
+      
           navBars.forEach(bar => {
             bar.style.background = '#000000';
           });
         }
-      }
+      }      
 
       // Update active section for navigation highlighting
       const sections = document.querySelectorAll('section[id]');

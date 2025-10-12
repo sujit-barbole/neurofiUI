@@ -314,7 +314,7 @@ body, html {
 
 .card-2 {
     top: 50%;
-    right: -60px; /* Half card extends beyond right edge */
+    right: 5px; /* Half card extends beyond right edge */
     animation-delay: 2s;
 }
 
@@ -2019,3 +2019,23 @@ body, html {
       width: 90%;   /* almost full width on mobile */
     }
   }
+
+  /* Reduce floating circle size on mobile */
+@media (max-width: 768px) {
+    .floating-element {
+      width: 60px;
+      height: 60px;
+      font-size: 1.6rem;
+    }
+  
+    /* Adjust edge position to keep 50% visible */
+    .element-1, .element-2, .element-3, .element-4,
+    .element-9, .element-10, .element-11, .element-12 {
+      left: -30px;
+    }
+    .element-5, .element-6, .element-7, .element-8,
+    .element-13, .element-14, .element-15, .element-16 {
+      right: -30px;
+    }
+  }
+  

@@ -2039,3 +2039,49 @@ body, html {
     }
   }
   
+/* Adjust side ornaments to be fully on-screen */
+.card-1,
+.card-3 {
+    left: 20px;
+}
+.card-2 {
+    right: 20px;
+}
+
+/* Move left-edge floating elements inward */
+.element-1,
+.element-2,
+.element-3,
+.element-4,
+.element-9,
+.element-10,
+.element-11,
+.element-12 {
+    left: 20px;
+}
+
+/* Move right-edge floating elements inward */
+.element-5,
+.element-6,
+.element-7,
+.element-8,
+.element-13,
+.element-14,
+.element-15,
+.element-16 {
+    right: 20px;
+}
+
+/* Optional: slightly reduce the width of the side animation lanes */
+.hero-animations-left,
+.hero-animations-right {
+    width: 18%;
+}
+
+@media (max-width: 1024px) {
+    .hero-animations-left,
+    .hero-animations-right {
+        width: 12%;
+    }
+}
+  

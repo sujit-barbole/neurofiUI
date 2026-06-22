@@ -1,723 +1,700 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import './LandingPage.css';
 
+const formatRupees = (num: number) =>
+  new Intl.NumberFormat('en-IN', {
+    style: 'currency',
+    currency: 'INR',
+    maximumFractionDigits: 0,
+  }).format(num);
+
+const PORTFOLIO_OPTIONS = [
+  { label: '10L', value: 1000000 },
+  { label: '50L', value: 5000000 },
+  { label: '1Cr', value: 10000000 },
+  { label: '5Cr', value: 50000000 },
+];
+
 const LandingPage: React.FC = () => {
-  const [isNavMenuActive, setIsNavMenuActive] = useState(false);
-  const [chatMessages, setChatMessages] = useState([
-    {
-      id: 1,
-      type: 'bot',
-      content: "Hello! I'm your AI financial assistant. How can I help you today?",
-      time: 'Just now'
-    }
-  ]);
-  const [activeSection, setActiveSection] = useState('home');
-  const [showPredefinedQuestions, setShowPredefinedQuestions] = useState(true);
+  const [isScrolled, setIsScrolled] = useState(false);
+  const [isStickyCtaVisible, setIsStickyCtaVisible] = useState(false);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [trustCounts, setTrustCounts] = useState({ direct: 0, conflict: 100 });
+  const [portfolioSize, setPortfolioSize] = useState(5000000);
+  const countingStartedRef = useRef(false);
+  const sectionRefs = useRef<Map<string, HTMLElement>>(new Map());
+  const [visibleSections, setVisibleSections] = useState<Set<string>>(new Set());
 
-  // Predefined questions and answers
-  const predefinedQuestions = [
-    {
-      id: 1,
-      question: "Give me acomprehensive financial health check, including my financial confidence score and runway calculation",
-      answer: "Starting your investment journey is exciting! Here's a step-by-step approach:\n\n1. **Set Clear Goals**: Define what you're investing for (retirement, house, education)\n2. **Build an Emergency Fund**: Save 3-6 months of expenses first\n3. **Start Small**: Begin with low-cost index funds or ETFs\n4. **Diversify**: Don't put all your money in one place\n5. **Stay Consistent**: Regular contributions work better than timing the market\n\nWould you like me to help you create a personalized investment plan?"
-    },
-    {
-      id: 2,
-      question: "What's the best retirement strategy?",
-      answer: "A solid retirement strategy depends on your age and goals, but here are key principles:\n\n**For Young Investors (20s-30s):**\n• Start early - time is your biggest advantage\n• Aim for 10-15% of income in retirement accounts\n• Consider Roth IRA for tax-free growth\n\n**For Mid-Career (40s-50s):**\n• Maximize employer 401(k) matching\n• Consider catch-up contributions\n• Review and rebalance annually\n\n**General Tips:**\n• Use the 4% withdrawal rule in retirement\n• Consider healthcare costs\n• Plan for multiple income sources\n\nWhat's your current age and retirement timeline?"
-    },
-    {
-      id: 3,
-      question: "How much should I save each month?",
-      answer: "The amount depends on your goals, but here are some guidelines:\n\n**Emergency Fund:** 3-6 months of expenses\n**Retirement:** 10-15% of gross income\n**General Savings:** 20% of take-home pay (50/30/20 rule)\n\n**50/30/20 Rule:**\n• 50% for needs (housing, food, utilities)\n• 30% for wants (entertainment, dining)\n• 20% for savings and debt repayment\n\n**Quick Calculation:**\nIf you earn $5,000/month:\n• Emergency fund: $15,000-$30,000\n• Retirement: $500-$750/month\n• General savings: $1,000/month\n\nWhat's your monthly income and current expenses?"
-    },
-    {
-      id: 4,
-      question: "What's the difference between stocks and bonds?",
-      answer: "Great question! Here's a simple breakdown:\n\n**Stocks (Equities):**\n• You own a piece of a company\n• Higher potential returns (8-10% historically)\n• Higher risk and volatility\n• Best for long-term growth (5+ years)\n\n**Bonds (Fixed Income):**\n• You're lending money to a company/government\n• Lower, more predictable returns (2-4% typically)\n• Lower risk and more stable\n• Good for income and stability\n\n**Key Differences:**\n• Risk: Stocks > Bonds\n• Returns: Stocks > Bonds\n• Volatility: Stocks > Bonds\n• Income: Bonds provide regular interest\n\n**Rule of Thumb:**\n• Young investors: 80% stocks, 20% bonds\n• Near retirement: 60% stocks, 40% bonds\n\nWhat's your risk tolerance and investment timeline?"
-    },
-    {
-      id: 5,
-      question: "How do I build good credit?",
-      answer: "Building good credit takes time and discipline. Here's how:\n\n**Essential Steps:**\n1. **Pay Bills On Time**: This is 35% of your credit score\n2. **Keep Credit Utilization Low**: Use less than 30% of available credit\n3. **Don't Close Old Accounts**: Length of credit history matters\n4. **Mix of Credit Types**: Credit cards, loans, mortgages\n5. **Check Your Credit Report**: Monitor for errors\n\n**Quick Wins:**\n• Set up automatic payments\n• Request credit limit increases\n• Become an authorized user on someone's account\n• Use credit cards for small purchases and pay off monthly\n\n**Timeline:**\n• 6 months: Start seeing improvements\n• 1-2 years: Significant score increase\n• 3+ years: Excellent credit possible\n\nWhat's your current credit situation?"
-    },
-    {
-      id: 6,
-      question: "Should I pay off debt or invest?",
-      answer: "This depends on your debt's interest rate. Here's the decision framework:\n\n**Pay Off Debt First If:**\n• Interest rate > 6-7%\n• High-interest credit cards (15-25%)\n• Personal loans (8-15%)\n• You're stressed about debt\n\n**Invest First If:**\n• Low-interest debt (< 4-5%)\n• Mortgage rates (3-4%)\n• Student loans (3-6%)\n• You have employer 401(k) matching\n\n**Hybrid Approach:**\n• Pay minimums on low-interest debt\n• Invest in 401(k) up to employer match\n• Aggressively pay high-interest debt\n• Then increase investments\n\n**Example:**\nIf you have $10,000 at 20% interest vs. investing at 8% return, paying debt saves you $1,200 more per year!\n\nWhat types of debt do you have and their interest rates?"
-    }
-  ];
-
-  // Modal state
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [modalTitle, setModalTitle] = useState('');
-  const [modalDescription, setModalDescription] = useState('');
-
-  // Notification state
-  const [showNotification, setShowNotification] = useState(false);
-  const [notificationMessage, setNotificationMessage] = useState('');
-
-  const toggleNavMenu = () => {
-    setIsNavMenuActive(!isNavMenuActive);
-  };
-
-
-  const handlePredefinedQuestion = (question: string, answer: string) => {
-    // Add user question to chat
-    const userMessage = {
-      id: chatMessages.length + 1,
-      type: 'user' as const,
-      content: question,
-      time: 'Just now'
-    };
-    
-    // Add bot answer to chat
-    const botMessage = {
-      id: chatMessages.length + 2,
-      type: 'bot' as const,
-      content: answer,
-      time: 'Just now'
-    };
-
-    setChatMessages(prev => [...prev, userMessage, botMessage]);
-    // Keep predefined questions visible after answer
-  };
-
-  const resetChat = () => {
-    setChatMessages([
-      {
-        id: 1,
-        type: 'bot',
-        content: "Hello! I'm your AI financial assistant. How can I help you today?",
-        time: 'Just now'
-      }
-    ]);
-    setShowPredefinedQuestions(true);
+  const registerSection = (key: string) => (el: HTMLElement | null) => {
+    if (el) sectionRefs.current.set(key, el);
   };
 
   useEffect(() => {
-    // Performance optimization for mobile animations
-    const isMobile = window.innerWidth <= 768;
-    const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    
-    if (isMobile && !prefersReducedMotion) {
-      // Enable hardware acceleration for mobile animations
-      const animatedElements = document.querySelectorAll('.floating-element, .floating-card');
-      animatedElements.forEach(el => {
-        (el as HTMLElement).style.transform = 'translate3d(0, 0, 0)';
-        (el as HTMLElement).style.willChange = 'transform';
-      });
-    }
-
-    // Smooth scrolling for navigation links
-    const navLinks = document.querySelectorAll('.nav-link[href^="#"]');
-
-    navLinks.forEach(link => {
-      link.addEventListener('click', function (e) {
-        e.preventDefault();
-        const targetId = (e.currentTarget as HTMLAnchorElement).getAttribute('href');
-        if (targetId) {
-          const targetSection = document.querySelector(targetId);
-          if (targetSection) {
-            targetSection.scrollIntoView({
-              behavior: 'smooth',
-              block: 'start'
-            });
-          }
-        }
-        setIsNavMenuActive(false);
-      });
-    });
-
-    // Header background change on scroll + section highlight
-    const handleScroll = () => {
-      const navbar = document.querySelector('.navbar') as HTMLElement;
-      const navLinks = document.querySelectorAll('.nav-link') as NodeListOf<HTMLElement>;
-      const navLogo = document.querySelector('.nav-logo h2') as HTMLElement;
-      const navBars = document.querySelectorAll('.bar') as NodeListOf<HTMLElement>;
-      
-      if (navbar) {
-        if (window.scrollY > 100) {
-          // REMOVE or COMMENT this entire block
-        } else {
-          // KEEP only this part below
-          navbar.style.background = 'rgba(255, 255, 255, 0.95)';
-          navbar.style.borderBottomColor = 'rgba(0, 0, 0, 0.1)';
-      
-          if (navLogo) {
-            navLogo.style.background = 'linear-gradient(135deg, #000000 0%, #333333 100%)';
-            navLogo.style.webkitBackgroundClip = 'text';
-            navLogo.style.webkitTextFillColor = 'transparent';
-            navLogo.style.backgroundClip = 'text';
-          }
-      
-          navLinks.forEach(link => {
-            link.style.color = 'rgba(0, 0, 0, 0.8)';
-          });
-      
-          navBars.forEach(bar => {
-            bar.style.background = '#000000';
-          });
-        }
-      }      
-
-      // Update active section for navigation highlighting
-      const sections = document.querySelectorAll('section[id]');
-      sections.forEach(section => {
-        const rect = section.getBoundingClientRect();
-        if (rect.top <= 100 && rect.bottom >= 100) {
-          setActiveSection(section.id);
-        }
-      });
+    const onScroll = () => {
+      setIsScrolled(window.scrollY > 50);
+      setIsStickyCtaVisible(window.scrollY > 400);
     };
-
-    window.addEventListener('scroll', handleScroll);
-
-    // Cleanup
-    return () => {
-      window.removeEventListener('scroll', handleScroll);
-    };
+    window.addEventListener('scroll', onScroll);
+    return () => window.removeEventListener('scroll', onScroll);
   }, []);
 
-  // Handle service item click
-  const handleServiceClick = (title: string, description: string) => {
-    setModalTitle(title);
-    setModalDescription(description);
-    setIsModalOpen(true);
+  useEffect(() => {
+    if (isMobileMenuOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = 'auto';
+    }
+  }, [isMobileMenuOpen]);
+
+  const startCounting = () => {
+    if (countingStartedRef.current) return;
+    countingStartedRef.current = true;
+
+    const duration = 2000;
+    const stepTime = 16;
+    const steps = duration / stepTime;
+
+    let directCurrent = 0;
+    const directIncrement = 100 / steps;
+    let conflictCurrent = 100;
+    const conflictIncrement = -100 / steps;
+
+    const tick = () => {
+      directCurrent += directIncrement;
+      conflictCurrent += conflictIncrement;
+
+      const directDone = directCurrent >= 100;
+      const conflictDone = conflictCurrent <= 0;
+
+      setTrustCounts({
+        direct: directDone ? 100 : Math.round(directCurrent),
+        conflict: conflictDone ? 0 : Math.round(conflictCurrent),
+      });
+
+      if (!directDone || !conflictDone) {
+        requestAnimationFrame(tick);
+      }
+    };
+
+    requestAnimationFrame(tick);
   };
 
-  const closeModal = () => {
-    setIsModalOpen(false);
-    setModalTitle('');
-    setModalDescription('');
-  };
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries, obs) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            const key = (entry.target as HTMLElement).dataset.sectionKey;
+            if (key) {
+              setVisibleSections((prev) => new Set(prev).add(key));
+              if (key === 'trust-strip') {
+                startCounting();
+              }
+            }
+            obs.unobserve(entry.target);
+          }
+        });
+      },
+      { root: null, rootMargin: '0px', threshold: 0.15 },
+    );
 
-  // Show notification function
-  const showMessageNotification = () => {
-    setNotificationMessage('🎉 Thank you! We have received your message and will get back to you soon.');
-    setShowNotification(true);
-    
-    // Auto hide after 4 seconds
-    setTimeout(() => {
-      setShowNotification(false);
-    }, 4000);
-  };
+    sectionRefs.current.forEach((el) => observer.observe(el));
 
-  // Handle form submission
-  const handleFormSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    showMessageNotification();
-    
-    // Reset form
-    const form = e.target as HTMLFormElement;
-    form.reset();
-  };
+    return () => observer.disconnect();
+  }, []);
+
+  const sectionClass = (key: string, base: string) =>
+    `${base} section-scroll${visibleSections.has(key) ? ' visible' : ''}`;
+
+  const annualCost = portfolioSize * 0.01;
+  const rDirect = 0.12;
+  const rRegular = 0.11;
+  const loss10Year =
+    portfolioSize * Math.pow(1 + rDirect, 10) - portfolioSize * Math.pow(1 + rRegular, 10);
+  const loss20Year =
+    portfolioSize * Math.pow(1 + rDirect, 20) - portfolioSize * Math.pow(1 + rRegular, 20);
+
+  const closeMobileMenu = () => setIsMobileMenuOpen(false);
 
   return (
-    <div className="landing-page">
-      {/* Navigation */}
-      <nav className="navbar">
-        <div className="nav-container">
-          <div className="nav-logo">
-            <h2>NeuroFi</h2>
+    <>
+      <div className="texture-overlay"></div>
+
+      <div className={`mobile-sticky-cta${isStickyCtaVisible ? ' visible' : ''}`}>
+        <a href="#contact" className="btn btn-primary-mobile">Talk to an Advisor</a>
+      </div>
+
+      <nav className={`navbar${isScrolled ? ' scrolled' : ''}`}>
+        <div className="container nav-container">
+          <div className="logo">
+            <a href="#">NeuroFi<span className="logo-dot">.</span></a>
           </div>
-          <ul className={`nav-menu ${isNavMenuActive ? 'active' : ''}`}>
-            <li><a href="#home" className={`nav-link ${activeSection === 'home' ? 'active' : ''}`}>Home</a></li>
-            <li><a href="#features" className={`nav-link ${activeSection === 'features' ? 'active' : ''}`}>Features</a></li>
-            <li><a href="#ai-chatbot" className={`nav-link ${activeSection === 'ai-chatbot' ? 'active' : ''}`}>AI Chatbot</a></li>
-            <li><a href="#expert-advisory" className={`nav-link ${activeSection === 'expert-advisory' ? 'active' : ''}`}>Expert Advisory</a></li>
-            <li><a href="#contact" className={`nav-link ${activeSection === 'contact' ? 'active' : ''}`}>Contact</a></li>
-          </ul>
-          <div className="nav-toggle" onClick={toggleNavMenu}>
-            <span className="bar"></span>
-            <span className="bar"></span>
-            <span className="bar"></span>
+
+          <div className="nav-links">
+            <a href="#how-it-works">How It Works</a>
+            <a href="#who-we-serve">Who We Serve</a>
+            <a href="#know-your-risk">Know Your Risk</a>
+            <a href="#clarify-your-goals">Clarify Your Goals</a>
+            <a href="#fiduciary">Why NeuroFi</a>
+            <a href="#contact" className="btn btn-nav">Talk to an Advisor</a>
           </div>
+
+          <button
+            className={`hamburger${isMobileMenuOpen ? ' active' : ''}`}
+            aria-label="Menu"
+            onClick={() => setIsMobileMenuOpen((v) => !v)}
+          >
+            <span className="bar"></span>
+            <span className="bar"></span>
+            <span className="bar"></span>
+          </button>
         </div>
       </nav>
 
-      {/* Hero Section */}
-      <section id="home" className="hero">
-        <div className="hero-container">
-          <div className="hero-text">
+      <div className={`mobile-menu${isMobileMenuOpen ? ' active' : ''}`}>
+        <div className="mobile-nav-links">
+          <a href="#how-it-works" className="mobile-link" onClick={closeMobileMenu}>How It Works</a>
+          <a href="#who-we-serve" className="mobile-link" onClick={closeMobileMenu}>Who We Serve</a>
+          <a href="#know-your-risk" className="mobile-link" onClick={closeMobileMenu}>Know Your Risk</a>
+          <a href="#clarify-your-goals" className="mobile-link" onClick={closeMobileMenu}>Clarify Your Goals</a>
+          <a href="#fiduciary" className="mobile-link" onClick={closeMobileMenu}>Fiduciary Difference</a>
+        </div>
+      </div>
+
+      <header className={sectionClass('hero', 'hero')} ref={registerSection('hero')} data-section-key="hero">
+        <div className="container hero-grid">
+          <div className="hero-content">
             <h1 className="hero-title">
-              AI-Powered Wealth Management That <span className="gradient-text">Understands You</span>
+              <span className="title-dimmed">We don't have any incentive to sell an investment product,</span>
+              <br />
+              <span className="title-but">BUT</span>
+              <br />
+              <span className="title-accented">we have every incentive to give you the best advice.</span>
             </h1>
             <p className="hero-subtitle">
-              Experience the future of financial planning with NeuroFi's intelligent AI chatbot and expert financial advisory services. Get personalized insights, real-time guidance, and expert advice to achieve your wealth goals.
+              Our Expert advisors are augmented by our proprietary AI to understand your financial position
+              &amp; situation better, model your needs &amp; risks, and deliver personalized recommendations to
+              you. <strong className="subtitle-highlight">Helping you make the most out of your Money.</strong>
             </p>
-            <div className="hero-buttons">
-              <a href="#ai-chatbot" className="btn btn-primary">Try AI Chatbot</a>
-              <a href="#expert-advisory" className="btn btn-secondary">Expert Advisory</a>
+            <div className="hero-ctas">
+              <a href="#contact" className="btn btn-primary">Talk to an Advisor Who Works in Your Best Interest</a>
+              <a href="#how-it-works" className="btn btn-secondary">See How NeuroFi Works</a>
             </div>
           </div>
           <div className="hero-visual">
-            <div className="floating-card card-1">
-              <span>📊</span> Smart Analytics
-            </div>
-            <div className="floating-card card-2">
-              <span>🤖</span> AI Assistant
-            </div>
-            <div className="floating-card card-3">
-              <span>🔒</span> Secure
-            </div>
-          </div>
-        </div>
-        
-        {/* Left Side Animations */}
-        <div className="hero-animations-left">
-          <div className="floating-element element-1">
-            <span>💰</span>
-          </div>
-          <div className="floating-element element-2">
-            <span>📈</span>
-          </div>
-          <div className="floating-element element-3">
-            <span>🎯</span>
-          </div>
-          <div className="floating-element element-4">
-            <span>⚡</span>
-          </div>
-          <div className="floating-element element-9">
-            <span>💳</span>
-          </div>
-          <div className="floating-element element-10">
-            <span>🏆</span>
-          </div>
-          <div className="floating-element element-11">
-            <span>📊</span>
-          </div>
-          <div className="floating-element element-12">
-            <span>🔐</span>
-          </div>
-        </div>
+            <svg
+              width="100%"
+              height="100%"
+              viewBox="0 0 500 350"
+              fill="none"
+              xmlns="http://www.w3.org/2000/svg"
+              className="hero-svg"
+            >
+              <path d="M40 310 L480 310" stroke="#8A99AD" strokeWidth="1" />
+              <path d="M40 40 L40 310" stroke="#8A99AD" strokeWidth="1" />
 
-        {/* Right Side Animations */}
-        <div className="hero-animations-right">
-          <div className="floating-element element-5">
-            <span>🔮</span>
+              <text x="40" y="330" fill="#8A99AD" fontFamily="Inter" fontSize="12">Age 24</text>
+              <text x="140" y="330" fill="#8A99AD" fontFamily="Inter" fontSize="12">Age 32</text>
+              <text x="240" y="330" fill="#8A99AD" fontFamily="Inter" fontSize="12">Age 40</text>
+              <text x="340" y="330" fill="#8A99AD" fontFamily="Inter" fontSize="12">Age 50</text>
+              <text x="440" y="330" fill="#8A99AD" fontFamily="Inter" fontSize="12">Age 60+</text>
+
+              <path d="M40 310 Q 200 280, 480 60" stroke="#C8972A" strokeWidth="3" fill="none" />
+              <path d="M40 310 Q 200 280, 480 60 L 480 310 Z" fill="url(#grad)" opacity="0.1" />
+
+              <circle cx="90" cy="296" r="4" fill="#080E14" stroke="#C8972A" strokeWidth="2" />
+              <text x="85" y="286" fill="#F5F6F8" fontFamily="Inter" fontSize="11" transform="rotate(-75, 85, 286)">Car Purchase ✓</text>
+
+              <circle cx="128" cy="283" r="4" fill="#080E14" stroke="#C8972A" strokeWidth="2" />
+              <text x="123" y="273" fill="#F5F6F8" fontFamily="Inter" fontSize="11" transform="rotate(-75, 123, 273)">Home Downpayment ✓</text>
+
+              <circle cx="187" cy="256" r="4" fill="#080E14" stroke="#C8972A" strokeWidth="2" />
+              <text x="182" y="246" fill="#F5F6F8" fontFamily="Inter" fontSize="11" transform="rotate(-75, 182, 246)">Family Vacation ✓</text>
+
+              <circle cx="275" cy="206" r="4" fill="#080E14" stroke="#C8972A" strokeWidth="2" />
+              <text x="270" y="196" fill="#F5F6F8" fontFamily="Inter" fontSize="11" transform="rotate(-75, 270, 196)">Child's Higher Ed ✓</text>
+
+              <circle cx="373" cy="140" r="4" fill="#080E14" stroke="#C8972A" strokeWidth="2" />
+              <text x="368" y="130" fill="#F5F6F8" fontFamily="Inter" fontSize="11" transform="rotate(-75, 368, 130)">Retirement Fund ✓</text>
+
+              <defs>
+                <linearGradient id="grad" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="#C8972A" />
+                  <stop offset="100%" stopColor="#080E14" stopOpacity="0" />
+                </linearGradient>
+              </defs>
+            </svg>
           </div>
-          <div className="floating-element element-6">
-            <span>💎</span>
+        </div>
+      </header>
+
+      <section
+        className={sectionClass('trust-strip', 'trust-strip')}
+        ref={registerSection('trust-strip')}
+        data-section-key="trust-strip"
+      >
+        <div className="container trust-container">
+          <div className="trust-item">
+            <div className="trust-value-wrapper">
+              <span className="trust-number">{trustCounts.direct}</span>
+              <span className="trust-suffix">%</span>
+            </div>
+            <span className="trust-label">Direct-Only<br />Placements</span>
           </div>
-          <div className="floating-element element-7">
-            <span>🚀</span>
+          <div className="trust-item">
+            <div className="trust-value-wrapper">
+              <svg
+                className="trust-icon-svg"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <circle cx="12" cy="12" r="10"></circle>
+                <polyline points="16 8 10 14 8 12"></polyline>
+              </svg>
+            </div>
+            <span className="trust-label sebi-label">SEBI Registered<br />Investment Advisory<br />Standard</span>
           </div>
-          <div className="floating-element element-8">
-            <span>⭐</span>
-          </div>
-          <div className="floating-element element-13">
-            <span>🎨</span>
-          </div>
-          <div className="floating-element element-14">
-            <span>🌟</span>
-          </div>
-          <div className="floating-element element-15">
-            <span>💡</span>
-          </div>
-          <div className="floating-element element-16">
-            <span>🔔</span>
+          <div className="trust-item">
+            <div className="trust-value-wrapper">
+              <span className="trust-number">{trustCounts.conflict}</span>
+              <span className="trust-suffix">%</span>
+            </div>
+            <span className="trust-label">Zero conflict<br />of Interest</span>
           </div>
         </div>
       </section>
 
-      {/* Features Section */}
-      <section id="features" className="features">
-        <div className="container">
-          <div className="section-header">
-            <h2>Why Choose NeuroFi?</h2>
-            <p>Revolutionary technology meets expert financial guidance</p>
+      <section
+        className={sectionClass('problem', 'problem-section')}
+        ref={registerSection('problem')}
+        data-section-key="problem"
+      >
+        <div className="container problem-stack">
+          <div className="problem-quote">
+            <h2>
+              "The value of money is happiness without stress.<br />
+              The purpose of wealth is to fulfill dreams without anxiety.<br />
+              That is the only outcome we work towards."
+            </h2>
           </div>
-          <div className="features-grid">
-            <div className="feature-card">
-              <div className="feature-icon">🤖</div>
-              <h3>AI-Powered Insights</h3>
-              <p>Advanced machine learning algorithms analyze your financial data to provide personalized recommendations and insights.</p>
-            </div>
-            <div className="feature-card">
-              <div className="feature-icon">🔒</div>
-              <h3>Bank-Level Security</h3>
-              <p>Your financial data is protected with enterprise-grade encryption and security protocols.</p>
-            </div>
-            <div className="feature-card">
-              <div className="feature-icon">⏰</div>
-              <h3>24/7 Availability</h3>
-              <p>Get instant answers to your financial questions anytime, anywhere with our AI chatbot.</p>
-            </div>
-            <div className="feature-card">
-              <div className="feature-icon">📋</div>
-              <h3>Personalized Planning</h3>
-              <p>Tailored financial plans based on your unique goals, risk tolerance, and financial situation.</p>
-            </div>
-            <div className="feature-card">
-              <div className="feature-icon">👨‍💼</div>
-              <h3>Expert Guidance</h3>
-              <p>Access to certified financial advisors with years of experience in wealth management.</p>
-            </div>
-            <div className="feature-card">
-              <div className="feature-icon">📱</div>
-              <h3>Mobile-First Design</h3>
-              <p>Seamless experience across all devices with our responsive, mobile-optimized platform.</p>
-            </div>
+          <div className="problem-intro">
+            <p>We operate on 5 Non-Negotiable Commitments that,</p>
+            <p className="problem-intro-no">Neither</p>
+            <p>Commission-Driven Distributor</p>
+            <p className="problem-intro-or">Nor</p>
+            <p>Product-Tied Advisor</p>
+            <p>can deliver to you.</p>
           </div>
-        </div>
-      </section>
-
-      {/* AI Chatbot Section */}
-      <section id="ai-chatbot" className="ai-chatbot">
-        <div className="container">
-          <div className="section-header">
-            <h2>Meet Your AI Financial Assistant</h2>
-            <p>Our intelligent chatbot understands your financial goals and provides personalized guidance in real-time. Ask questions, get insights, and receive actionable advice instantly.</p>
-          </div>
-          <div className="ai-content">
-            <div className="ai-text">
-              <div className="ai-features">
-                <div className="ai-feature">
-                  <span>✓</span> Personalized financial analysis
-                </div>
-                <div className="ai-feature">
-                  <span>✓</span> Investment recommendations
-                </div>
-                <div className="ai-feature">
-                  <span>✓</span> Budget planning assistance
-                </div>
-                <div className="ai-feature">
-                  <span>✓</span> Risk assessment
-                </div>
-                <div className="ai-feature">
-                  <span>✓</span> Market insights
-                </div>
-              </div>
-              <a href="#contact" className="btn btn-primary">Experience the AI in Action</a>
+          <div className="problem-cards">
+            <div className="problem-card">
+              <div className="problem-card-title">Your Interest, Always First</div>
+              <div className="problem-card-desc">We are legally bound to act in your best interest — not ours. Zero commissions from fund houses. Zero product quotas. Your financial goals are our only mandate.</div>
             </div>
-            <div className="chat-interface">
-              <div className="chat-header">
-                <div className="chat-avatar">🤖</div>
-                <div className="chat-info">
-                  <h4>NeuroFi AI Assistant</h4>
-                  <span className="status">Online</span>
-                </div>
-                <button className="chat-reset" onClick={resetChat} title="Start New Conversation">
-                  🔄
-                </button>
-              </div>
-              <div className="chat-messages">
-                {chatMessages.map(message => (
-                  <div key={message.id} className={`message ${message.type === 'bot' ? 'bot-message' : 'user-message'}`}>
-                    <div className="message-content">{message.content}</div>
-                    <div className="message-time">{message.time}</div>
-                  </div>
-                ))}
-                
-                {/* Predefined Questions */}
-                {showPredefinedQuestions && (
-                  <div className="predefined-questions">
-                    <div className="questions-header">
-                      <span>💡 Quick Questions</span>
-                    </div>
-                    <div className="questions-grid">
-                      {predefinedQuestions.map(q => (
-                        <button
-                          key={q.id}
-                          className="question-button"
-                          onClick={() => handlePredefinedQuestion(q.question, q.answer)}
-                        >
-                          {q.question}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-              {/* Text input removed - using predefined questions only */}
+            <div className="problem-card">
+              <div className="problem-card-title">Direct Plans, Better Returns</div>
+              <div className="problem-card-desc">We invest exclusively through zero-commission direct mutual fund plans. The difference? Lakhs more in your portfolio over time — money that would otherwise go to distributors.</div>
+            </div>
+            <div className="problem-card">
+              <div className="problem-card-title">Beyond Just Picking Funds</div>
+              <div className="problem-card-desc">We don't just recommend investments. We map your goals, assess your real risks, and build a plan that accounts for taxes, insurance, liabilities, and life events.</div>
+            </div>
+            <div className="problem-card">
+              <div className="problem-card-title">Your Complete Wealth, Managed</div>
+              <div className="problem-card-desc">Tax optimization, insurance review, emergency planning, estate structuring — we manage the full spectrum of your financial well-being, not just your investment portfolio.</div>
+            </div>
+            <div className="problem-card">
+              <div className="problem-card-title">Institutional Discipline, For You</div>
+              <div className="problem-card-desc">The same research-backed, risk-managed asset allocation used by large family offices and institutional investors — now applied to your personal wealth.</div>
             </div>
           </div>
         </div>
       </section>
 
-      {/* Expert Advisory Section */}
-      <section id="expert-advisory" className="advisory">
+      <section
+        id="how-it-works"
+        className={sectionClass('process', 'process-section')}
+        ref={registerSection('process')}
+        data-section-key="process"
+      >
         <div className="container">
           <div className="section-header">
-            <h2>Expert Financial Advisory</h2>
-            <p>Connect with certified financial advisors who understand your unique situation. Get personalized strategies, comprehensive financial planning, and ongoing support to achieve your wealth goals.</p>
+            <h2>The Advisory Process</h2>
+            <p>A structured methodology combining AI-driven analysis with human stewardship.</p>
           </div>
-          <div className="advisory-content">
-            <div className="advisory-text">
-              <div className="advisory-services">
-                <div className="service-item" onClick={() => handleServiceClick("Investment Planning", "Strategic investment advice tailored to your goals and risk tolerance.")}>
-                  <div className="service-icon">📈</div>
-                  <div className="service-content">
-                    <h4>Investment Planning</h4>
-                  </div>
-                </div>
-                <div className="service-item" onClick={() => handleServiceClick("Retirement Planning", "Comprehensive retirement strategies to secure your financial future.")}>
-                  <div className="service-icon">🏖️</div>
-                  <div className="service-content">
-                    <h4>Retirement Planning</h4>
-                   </div>
-                </div>
-                <div className="service-item" onClick={() => handleServiceClick("Risk Management", "Protect your wealth with expert risk assessment and mitigation strategies.")}>
-                  <div className="service-icon">🛡️</div>
-                  <div className="service-content">
-                    <h4>Risk Management</h4>
-                   </div>
-                </div>
-                <div className="service-item" onClick={() => handleServiceClick("Tax Optimization", "Minimize tax liability and maximize your wealth with smart tax strategies.")}>
-                  <div className="service-icon">💰</div>
-                  <div className="service-content">
-                    <h4>Tax Optimization</h4>
-                 </div>
-                </div>
+
+          <div className="timeline">
+            <div className="timeline-line"></div>
+
+            <div className="timeline-step step-reveal visible">
+              <div className="step-number">1</div>
+              <div className="step-content">
+                <h3>Understand your financial picture</h3>
+                <p>Our intelligence engine gathers, organizes, and analyzes your current financial position with surgical precision, identifying risks and inefficiencies instantly.</p>
               </div>
-              <a href="#contact" className="btn btn-primary">Schedule Free Consultation</a>
             </div>
+
+            <div className="timeline-step step-reveal visible">
+              <div className="step-number">2</div>
+              <div className="step-content">
+                <h3>Get clarity on your goals and risks</h3>
+                <p>We model long-horizon scenarios. Advisors review these projections and frame decisions with structured judgment, ensuring realism over optimism.</p>
+              </div>
+            </div>
+
+            <div className="timeline-step step-reveal visible">
+              <div className="step-number">3</div>
+              <div className="step-content">
+                <h3>Receive fiduciary advice</h3>
+                <p>A human advisor aligns recommendations strictly to your best interest. Every decision is documented, transparent, and built for compounding.</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="ai-human-bridge">
+            <p>Our AI models scenarios and identifies risks with surgical precision — but it does not make the final call. Every recommendation you receive comes from a dedicated human advisor who carries full fiduciary responsibility for your wealth.</p>
+          </div>
+
+          <div className="cta-container">
+            <a href="#contact" className="btn btn-secondary">Start With a Conversation</a>
           </div>
         </div>
       </section>
 
-      {/* Modal */}
-      {isModalOpen && (
-        <div className="modal-overlay" onClick={closeModal}>
-          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-            <button className="modal-close" onClick={closeModal}>×</button>
-            <h3>{modalTitle}</h3>
-            <p>{modalDescription}</p>
-          </div>
-        </div>
-      )}
-
-      {/* Testimonials Section */}
-      {/* <section id="testimonials" className="testimonials">
+      <section
+        id="who-we-serve"
+        className={sectionClass('serve', 'serve-section')}
+        ref={registerSection('serve')}
+        data-section-key="serve"
+      >
         <div className="container">
           <div className="section-header">
-            <h2>What Our Clients Say</h2>
-            <p>Join thousands of satisfied customers who trust NeuroFi with their financial future</p>
+            <h2>Built for the Long-Horizon Investor</h2>
           </div>
-          <div className="testimonials-grid">
-            <div className="testimonial-card">
-              <div className="testimonial-content">
-                <p>"NeuroFi's AI chatbot helped me understand complex investment strategies in simple terms. My portfolio has grown 25% since I started using their service."</p>
-              </div>
-              <div className="testimonial-author">
-                <div className="author-avatar">👨‍💼</div>
-                <div className="author-info">
-                  <h4>Michael Chen</h4>
-                  <span>Software Engineer, 35</span>
-                </div>
-                <div className="rating">⭐⭐⭐⭐⭐</div>
-              </div>
-            </div>
-            <div className="testimonial-card">
-              <div className="testimonial-content">
-                <p>"The expert advisory team at NeuroFi created a comprehensive retirement plan that gives me confidence about my future. Highly recommend!"</p>
-              </div>
-              <div className="testimonial-author">
-                <div className="author-avatar">👩‍💼</div>
-                <div className="author-info">
-                  <h4>Jennifer Martinez</h4>
-                  <span>Marketing Director, 42</span>
-                </div>
-                <div className="rating">⭐⭐⭐⭐⭐</div>
-              </div>
-            </div>
-            <div className="testimonial-card">
-              <div className="testimonial-content">
-                <p>"As a small business owner, NeuroFi helped me optimize my tax strategy and plan for business growth. The AI insights are incredibly valuable."</p>
-              </div>
-              <div className="testimonial-author">
-                <div className="author-avatar">👨‍💼</div>
-                <div className="author-info">
-                  <h4>David Thompson</h4>
-                  <span>Business Owner, 38</span>
-                </div>
-                <div className="rating">⭐⭐⭐⭐⭐</div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section> */}
 
-      {/* Pricing Section */}
-      {/* <section id="pricing" className="pricing">
-        <div className="container">
-          <div className="section-header">
-            <h2>Choose Your Plan</h2>
-            <p>Flexible pricing options to suit your financial needs</p>
-          </div>
-          <div className="pricing-grid">
-            <div className="pricing-card">
-              <div className="pricing-header">
-                <h3>Starter</h3>
-                <div className="price">
-                  <span className="currency">$</span>
-                  <span className="amount">0</span>
-                  <span className="period">/month</span>
-                </div>
-              </div>
-              <ul className="pricing-features">
-                <li><span>✓</span> AI Chatbot Access</li>
-                <li><span>✓</span> Basic Financial Analysis</li>
-                <li><span>✓</span> Budget Tracking</li>
-                <li><span>✓</span> Mobile App Access</li>
-                <li className="disabled"><span>✗</span> Expert Advisory</li>
-                <li className="disabled"><span>✗</span> Personalized Plans</li>
+          <div className="cards-grid">
+            <div className="serve-card">
+              <div className="card-accent-line"></div>
+              <h3>For Corporate Professionals</h3>
+              <ul className="serve-list">
+                <li><strong>Your Struggle:</strong> Savings scattered across too many instruments — mutual funds, insurance policies, company benefits — with no unified strategy connecting them.</li>
+                <li><strong>Your Desire:</strong> A consolidated, tax-efficient plan that turns fragmented savings into structured, long-term wealth.</li>
+                <li><strong>Our Solution:</strong> Portfolio rationalization, tax-optimized allocation, and a clear financial roadmap aligned to your life milestones.</li>
               </ul>
-              <a href="#contact" className="btn btn-outline">Get Started Free</a>
             </div>
-            <div className="pricing-card featured">
-              <div className="pricing-badge">Most Popular</div>
-              <div className="pricing-header">
-                <h3>Professional</h3>
-                <div className="price">
-                  <span className="currency">$</span>
-                  <span className="amount">29</span>
-                  <span className="period">/month</span>
-                </div>
-              </div>
-              <ul className="pricing-features">
-                <li><span>✓</span> Everything in Starter</li>
-                <li><span>✓</span> Advanced AI Insights</li>
-                <li><span>✓</span> Investment Recommendations</li>
-                <li><span>✓</span> Quarterly Expert Review</li>
-                <li><span>✓</span> Priority Support</li>
-                <li><span>✓</span> Custom Financial Goals</li>
-              </ul>
-              <a href="#contact" className="btn btn-primary">Start Free Trial</a>
-            </div>
-            <div className="pricing-card">
-              <div className="pricing-header">
-                <h3>Premium</h3>
-                <div className="price">
-                  <span className="currency">$</span>
-                  <span className="amount">99</span>
-                  <span className="period">/month</span>
-                </div>
-              </div>
-              <ul className="pricing-features">
-                <li><span>✓</span> Everything in Professional</li>
-                <li><span>✓</span> Dedicated Financial Advisor</li>
-                <li><span>✓</span> Monthly Strategy Sessions</li>
-                <li><span>✓</span> Tax Optimization</li>
-                <li><span>✓</span> Estate Planning</li>
-                <li><span>✓</span> 24/7 Priority Support</li>
-              </ul>
-              <a href="#contact" className="btn btn-outline">Contact Sales</a>
-            </div>
-          </div>
-        </div>
-      </section> */}
 
-      {/* Contact Section */}
-      <section id="contact" className="contact">
-        <div className="container">
-          <div className="section-header">
-            <h2>Get in Touch</h2>
-            <p>Ready to transform your financial future? Let's start the conversation.</p>
-          </div>
-          <div className="contact-content">
-            <div className="contact-info">
-              <div className="contact-details">
-                <div className="contact-item">
-                  <span>📧</span>
-                  <div>
-                    <h4>Email</h4>
-                    <p>Info@neurofi.in</p>
-                  </div>
-                </div>
-                <div className="contact-item">
-                  <span>📞</span>
-                  <div>
-                    <h4>Phone</h4>
-                    <p>+91-9113662144</p>
-                  </div>
-                </div>
-                <div className="contact-item">
-                  <span>🏢</span>
-                  <div>
-                    <h4>Office</h4>
-                    <p>Neurofi HQ, HSR layout, sector 1, Bengalore,560102</p>
-                  </div>
-                </div>
-              </div>
+            <div className="serve-card">
+              <div className="card-accent-line"></div>
+              <h3>For Freelancers &amp; Independent Professionals</h3>
+              <ul className="serve-list">
+                <li><strong>Your Struggle:</strong> Irregular income makes planning hard. No employer benefits, no pension, no safety net — just you and your hustle.</li>
+                <li><strong>Your Desire:</strong> Financial stability and a disciplined path to building wealth, despite unpredictable cash flows.</li>
+                <li><strong>Our Solution:</strong> Cash flow structuring, emergency reserves, and a flexible investment framework designed for variable income patterns.</li>
+              </ul>
             </div>
-            <div className="contact-form">
-              <form onSubmit={handleFormSubmit}>
-                <div className="form-group">
-                  <select name="service" required>
-                    <option value="">Select Service</option>
-                    <option value="ai-chatbot">AI Chatbot</option>
-                    <option value="expert-advisory">Expert Advisory</option>
-                    <option value="both-services">Both Services</option>
-                  </select>
-                </div>
-                <div className="form-group">
-                  <textarea name="message" placeholder="Send Message" required></textarea>
-                </div>
-                <button type="submit" className="btn btn-primary">Send Message</button>
-              </form>
+
+            <div className="serve-card">
+              <div className="card-accent-line"></div>
+              <h3>For Business Owners</h3>
+              <ul className="serve-list">
+                <li><strong>Your Struggle:</strong> Personal wealth tangled with business finances. No clear separation between what's yours and what's the company's.</li>
+                <li><strong>Your Desire:</strong> Protect family wealth independent of business outcomes, with clarity on succession and liquidity planning.</li>
+                <li><strong>Our Solution:</strong> Business-personal wealth separation, succession structuring, and risk ring-fencing — so your family's future isn't tied to your P&amp;L.</li>
+              </ul>
+            </div>
+
+            <div className="serve-card">
+              <div className="card-accent-line"></div>
+              <h3>For Families</h3>
+              <ul className="serve-list">
+                <li><strong>Your Struggle:</strong> Coordinating finances across generations — parents' retirement, children's education, estate transfer — with no unified view.</li>
+                <li><strong>Your Desire:</strong> Peace of mind that every family member's financial future is planned, protected, and on track.</li>
+                <li><strong>Our Solution:</strong> Multi-generational wealth planning, estate structuring, and unified family advisory under one fiduciary standard.</li>
+              </ul>
             </div>
           </div>
         </div>
       </section>
 
-      {/* Notification */}
-      {showNotification && (
-        <div className="notification-overlay">
-          <div className="notification">
-            <div className="notification-icon">✓</div>
-            <div className="notification-content">
-              <h4>Message Sent!</h4>
-              <p>{notificationMessage}</p>
+      <section
+        id="know-your-risk"
+        className={sectionClass('risk', 'risk-section')}
+        ref={registerSection('risk')}
+        data-section-key="risk"
+      >
+        <div className="container">
+          <div className="section-header">
+            <h2>Risk Is Not What You Think It Is</h2>
+            <p>Most investors confuse volatility with risk. Real risk is permanent loss of capital — or worse, failing to reach the financial goals that matter to you.</p>
+          </div>
+
+          <div className="risk-grid">
+            <div className="risk-card">
+              <div className="card-accent-line"></div>
+              <h3>Inflation Risk</h3>
+              <p>If your money grows at 7% but inflation runs at 6%, your real wealth grows at just 1%. Safe-feeling instruments like FDs often lose to inflation after tax.</p>
             </div>
-            <button className="notification-close" onClick={() => setShowNotification(false)}>
-              ×
-            </button>
+
+            <div className="risk-card">
+              <div className="card-accent-line"></div>
+              <h3>Concentration Risk</h3>
+              <p>Having 60% of your net worth in one asset — your home, your company's stock, or a single sector — is not conviction. It is unmanaged exposure.</p>
+            </div>
+
+            <div className="risk-card">
+              <div className="card-accent-line"></div>
+              <h3>Advisor Misalignment Risk</h3>
+              <p>The most expensive risk isn't market risk. It's the risk that your advisor's incentives don't match your goals. A commission-driven recommendation compounds against you silently.</p>
+            </div>
+          </div>
+
+          <div className="risk-footer">
+            <p>NeuroFi's advisory begins with an honest risk assessment — not a questionnaire that tells you what you want to hear.</p>
+            <a href="#contact" className="btn btn-primary">Talk to an Advisor About Your Risk Profile</a>
           </div>
         </div>
-      )}
+      </section>
 
-      {/* Footer */}
+      <section
+        id="clarify-your-goals"
+        className={sectionClass('goals', 'goals-section')}
+        ref={registerSection('goals')}
+        data-section-key="goals"
+      >
+        <div className="container">
+          <div className="section-header">
+            <h2>What Are You Actually Planning For?</h2>
+            <p>Before we recommend a single instrument, we need to understand what success looks like for you.</p>
+          </div>
+
+          <div className="goals-list">
+            <div className="goal-row">
+              <div className="goal-title">Retirement without compromise</div>
+              <div className="goal-desc">Replacing your income stream permanently — so that your lifestyle isn't a negotiation.</div>
+            </div>
+            <div className="goal-row">
+              <div className="goal-title">Children's higher education</div>
+              <div className="goal-desc">Funding a ₹30–80L education goal in 8–15 years requires structured, inflation-adjusted planning — not hope.</div>
+            </div>
+            <div className="goal-row">
+              <div className="goal-title">First home or second property</div>
+              <div className="goal-desc">Separating emotion from math. We model downpayment timelines, EMI loads, and opportunity costs.</div>
+            </div>
+            <div className="goal-row">
+              <div className="goal-title">Wealth transfer &amp; estate clarity</div>
+              <div className="goal-desc">Ensuring your assets reach the right people, at the right time, with minimum friction and maximum tax efficiency.</div>
+            </div>
+            <div className="goal-row">
+              <div className="goal-title">Financial independence before 50</div>
+              <div className="goal-desc">FIRE isn't a meme for everyone. For some, it's a serious, achievable, numbers-driven plan.</div>
+            </div>
+          </div>
+
+          <div className="goals-footer">
+            <p>Your goals define your strategy. Not the other way around.</p>
+            <a href="#contact" className="btn btn-primary">Start With Your Goals</a>
+          </div>
+        </div>
+      </section>
+
+      <section
+        id="fiduciary"
+        className={sectionClass('fiduciary', 'fiduciary-section')}
+        ref={registerSection('fiduciary')}
+        data-section-key="fiduciary"
+      >
+        <div className="container">
+          <div className="section-header">
+            <h2>The Fiduciary Standard</h2>
+            <p>A fiduciary advisor is legally and ethically obligated to act in your best interest. No commissions. No product quotas. No conflicts.</p>
+          </div>
+
+          <div className="fiduciary-grid">
+            <div className="comparison-panel">
+              <div className="compare-row compare-header">
+                <div className="compare-col-label"></div>
+                <div className="compare-col-traditional">Traditional Distributor</div>
+                <div className="compare-col-bank">Bank Affiliated Distributors</div>
+                <div className="compare-col-neurofi">NeuroFi Fiduciary</div>
+              </div>
+
+              <div className="compare-row">
+                <div className="compare-col-label">Compensation</div>
+                <div className="compare-col-traditional">Hidden Product Commissions</div>
+                <div className="compare-col-bank">Cross-Selling &amp; Targets</div>
+                <div className="compare-col-neurofi highlight-text">Flat Advisory Fee</div>
+              </div>
+
+              <div className="compare-row">
+                <div className="compare-col-label">Mutual Funds Used</div>
+                <div className="compare-col-traditional">Regular Plans (High Expense)</div>
+                <div className="compare-col-bank">In-House Products Pushed</div>
+                <div className="compare-col-neurofi highlight-text">Direct Plans (Low Expense)</div>
+              </div>
+
+              <div className="compare-row">
+                <div className="compare-col-label">Legal Duty</div>
+                <div className="compare-col-traditional">Suitability Standard</div>
+                <div className="compare-col-bank">Corporate Mandate</div>
+                <div className="compare-col-neurofi highlight-text">Strict Fiduciary Standard</div>
+              </div>
+
+              <div className="compare-row">
+                <div className="compare-col-label">Incentive</div>
+                <div className="compare-col-traditional">Sell High-Margin Products</div>
+                <div className="compare-col-bank">Meet Branch Quotas</div>
+                <div className="compare-col-neurofi highlight-text">Grow Your Net Worth</div>
+              </div>
+            </div>
+
+            <div className="calculator-panel">
+              <h3>The Hidden Commission Calculator</h3>
+              <p className="calc-desc">See the impact of 1% hidden distributor commissions (Regular vs Direct plans) on your wealth over time.</p>
+
+              <div className="calc-input-group">
+                <label>Current Portfolio Size (₹)</label>
+                <div className="portfolio-buttons">
+                  {PORTFOLIO_OPTIONS.map((opt) => (
+                    <button
+                      key={opt.value}
+                      className={`calc-btn${portfolioSize === opt.value ? ' active' : ''}`}
+                      onClick={() => setPortfolioSize(opt.value)}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="calc-results">
+                <div className="result-box">
+                  <span className="result-label">Hidden Annual Cost</span>
+                  <span className="result-value text-red">{formatRupees(annualCost)}</span>
+                </div>
+                <div className="result-box">
+                  <span className="result-label">Wealth Lost (10 Yrs)*</span>
+                  <span className="result-value">{formatRupees(loss10Year)}</span>
+                </div>
+                <div className="result-box highlighted-result">
+                  <span className="result-label">Wealth Lost (20 Yrs)*</span>
+                  <span className="result-value text-gold">{formatRupees(loss20Year)}</span>
+                </div>
+              </div>
+              <p className="calc-note">*Assuming 12% annual growth. The cost of conflicted advice compounds against you.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <hr className="section-divider" />
+
+      <section
+        className={sectionClass('scenarios', 'scenarios-section')}
+        ref={registerSection('scenarios')}
+        data-section-key="scenarios"
+      >
+        <div className="container">
+          <div className="section-header">
+            <h2>Client Stories</h2>
+            <p>Real advisory experiences from our practice — coming soon.</p>
+          </div>
+        </div>
+      </section>
+
+      <section
+        className={sectionClass('security', 'security-strip')}
+        ref={registerSection('security')}
+        data-section-key="security"
+      >
+        <div className="container">
+          <div className="security-strip-grid">
+            <div className="security-strip-item">
+              <svg className="security-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+              </svg>
+              <div className="security-strip-text">
+                <strong>Your Data Stays Yours</strong>
+                <span>We never sell or share your financial data with third parties.</span>
+              </div>
+            </div>
+            <div className="security-strip-item">
+              <svg className="security-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+                <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+              </svg>
+              <div className="security-strip-text">
+                <strong>256-Bit Encrypted</strong>
+                <span>All interactions secured with bank-grade SSL encryption.</span>
+              </div>
+            </div>
+            <div className="security-strip-item">
+              <svg className="security-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+                <polyline points="22 4 12 14.01 9 11.01"></polyline>
+              </svg>
+              <div className="security-strip-text">
+                <strong>Direct Settlement Only</strong>
+                <span>Your money moves directly between your bank and official AMCs. Never pooled.</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section
+        id="contact"
+        className={sectionClass('cta-footer', 'cta-footer')}
+        ref={registerSection('cta-footer')}
+        data-section-key="cta-footer"
+      >
+        <div className="container cta-footer-container">
+          <p className="cta-kicker">The most expensive financial mistake isn't a bad investment.</p>
+          <h2>It's years of advice that was never in your interest.</h2>
+          <div className="cta-actions">
+            <a href="#" className="btn btn-primary btn-large">Get a Free Portfolio Review</a>
+            <a href="#how-it-works" className="btn btn-secondary btn-large">Understand Our Process First</a>
+          </div>
+          <div className="contact-details">
+            <p className="cta-reassurance">No products to sell. No obligations. Just an honest assessment of where you stand.</p>
+            <p>advisory@neurofi.in | We respond within 4 hours.</p>
+          </div>
+        </div>
+      </section>
+
       <footer className="footer">
-        <div className="container">
-          <div className="footer-content">
-            <div className="footer-section">
-              <h3>NeuroFi</h3>
-              <p>AI-powered wealth management and financial advisory services to help you achieve your financial goals.</p>
-            </div>
-            <div className="footer-section">
-              <h4>Products</h4>
-              <ul>
-                <li><a href="#ai-chatbot">AI Chatbot</a></li>
-                <li><a href="#expert-advisory">Expert Advisory</a></li>
-              </ul>
-            </div>
-            {/* <div className="footer-section">
-              <h4>Company</h4>
-              <ul>
-                <li><a href="#about">About Us</a></li>
-                <li><a href="#careers">Careers</a></li>
-                <li><a href="#blog">Blog</a></li>
-                <li><a href="#press">Press</a></li>
-              </ul>
-            </div>
-            <div className="footer-section">
-              <h4>Support</h4>
-              <ul>
-                <li><a href="#help">Help Center</a></li>
-                <li><a href="#contact">Contact Us</a></li>
-                <li><a href="#privacy">Privacy Policy</a></li>
-                <li><a href="#terms">Terms of Service</a></li>
-              </ul>
-            </div> */}
+        <div className="container footer-grid">
+          <div className="footer-brand">
+            <div className="logo">NeuroFi<span className="logo-dot">.</span></div>
+            <p>Judgment, not incentives.</p>
           </div>
-          <div className="footer-bottom">
-            <p>© 2024 NeuroFi. All rights reserved.</p>
+          <div className="footer-links">
+            <h4>Navigation</h4>
+            <a href="#how-it-works">How It Works</a>
+            <a href="#who-we-serve">Who We Serve</a>
+            <a href="#fiduciary">Why NeuroFi</a>
           </div>
+          <div className="footer-links">
+            <h4>Legal</h4>
+            <a href="#">Privacy Policy</a>
+            <a href="#">Terms of Service</a>
+            <a href="#">SEBI Investor Charter</a>
+          </div>
+          <div className="footer-social">
+            <h4>Connect</h4>
+            <a href="#">LinkedIn</a>
+            <a href="#">YouTube</a>
+          </div>
+        </div>
+        <div className="container footer-bottom">
+          <p className="footer-compliance">SEBI Registered Investment Advisor · Flat Fee Advisory · Zero Product Commissions · Strict Conflict of Interest Policy</p>
+          <p>&copy; 2026 NeuroFi Advisory. All rights reserved.</p>
+          <p className="disclaimer">Disclaimer: Investment in securities market is subject to market risks; there is no guaranteed or assured return. Past performance is not indicative of future results. NeuroFi provides advisory services based on structured analysis; investors must read all related documents carefully and assess their own risk appetite before making investment decisions. NeuroFi does not guarantee specific outcomes or returns. Registration granted by SEBI does not certify the correctness, completeness, or adequacy of the services provided. Fee schedules and full disclosures are available upon request at advisory@neurofi.in.</p>
         </div>
       </footer>
-    </div>
+    </>
   );
 };
 

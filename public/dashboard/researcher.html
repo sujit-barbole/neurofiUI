@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>NeuroFi — Researcher Portal</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="style.css"/>
+  <script src="/dashboard/auth-guard.js" data-required-role="researcher"></script>
+  <style>
+    /* Researcher unique UI styles */
+    .artifact-panel {
+      margin-bottom: 20px;
+    }
+    .artifact-panel-hdr {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 14px 18px;
+      background: var(--bg-glass);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-md) var(--radius-md) 0 0;
+      cursor: pointer;
+      transition: background var(--tr-fast);
+    }
+    .artifact-panel-hdr:hover {
+      background: var(--bg-glass-hover);
+    }
+    .artifact-panel-hdr h3 {
+      font-size: 0.88rem;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .artifact-panel-hdr .chevron {
+      transition: transform var(--tr-smooth);
+      color: var(--text-muted);
+    }
+    .artifact-panel.open .chevron {
+      transform: rotate(180deg);
+    }
+    .artifact-panel .artifact-viewer {
+      border-radius: 0 0 var(--radius-md) var(--radius-md);
+      margin-top: 0;
+      border-top: 0;
+    }
+    .artifact-panel:not(.open) .artifact-viewer {
+      display: none;
+    }
+    
+    .empty-msg {
+      padding: 18px;
+      color: var(--text-muted);
+      font-size: 0.82rem;
+      font-style: italic;
+      background: rgba(0, 0, 0, 0.15);
+      border-radius: 0 0 var(--radius-md) var(--radius-md);
+      border: 1px solid var(--border-subtle);
+      border-top: 0;
+    }
+    
+    .horizon-tbl {
+      margin-top: 18px;
+    }
+    
+    .product-row {
+      background: var(--bg-glass);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-md);
+      padding: 18px;
+      margin-bottom: 10px;
+    }
+    .product-row .prod-hdr {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 8px;
+    }
+    .product-row .prod-name {
+      font-weight: 700;
+      font-size: 0.9rem;
+    }
+    .product-row .prod-er {
+      font-size: 0.75rem;
+      color: #34d399;
+      font-weight: 600;
+    }
+    .product-row .prod-cat {
+      font-size: 0.72rem;
+      color: var(--text-muted);
+      margin-bottom: 10px;
+    }
+    .product-row textarea {
+      width: 100%;
+      min-height: 60px;
+      padding: 9px 12px;
+      background: var(--bg-input);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-sm);
+      color: var(--text-primary);
+      font-family: var(--font);
+      font-size: 0.85rem;
+      line-height: 1.5;
+      resize: vertical;
+      outline: 0;
+      transition: all var(--tr-fast);
+    }
+    .product-row textarea:focus {
+      background: var(--bg-input-focus);
+      border-color: rgba(124, 58, 237, 0.6);
+      box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.15);
+    }
+    
+    .plan-section {
+      margin-bottom: 16px;
+    }
+    .plan-section h4 {
+      font-family: var(--font-display);
+      font-size: 0.78rem;
+      font-weight: 700;
+      color: #a78bfa;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      margin-bottom: 8px;
+      padding-bottom: 5px;
+      border-bottom: 1px solid var(--border-subtle);
+    }
+    .plan-check {
+      font-size: 0.72rem;
+      color: var(--text-muted);
+      margin-top: 4px;
+    }
+    .plan-check.ok {
+      color: #34d399;
+    }
+    .plan-check.missing {
+      color: var(--color-danger);
+    }
+  </style>
+</head>
+<body class="researcher-portal">
+  <!-- Mesh animated background orbs -->
+  <div class="mesh-bg">
+    <div class="orb orb-1"></div>
+    <div class="orb orb-2"></div>
+    <div class="orb orb-3"></div>
+  </div>
+
+  <div class="portal-layout">
+    <!-- ═══ SIDEBAR ═══ -->
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-brand">
+        <div class="brand-icon re-bg">S</div>
+        <div class="brand-text">
+          <span class="brand-name">Researcher Portal</span>
+          <span class="brand-tagline">Investment Strategist</span>
+        </div>
+      </div>
+
+      <nav class="sidebar-nav">
+        <div class="nav-label">Navigation</div>
+
+        <button class="nav-btn active" data-view="overview" id="nav-overview">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+          Overview
+        </button>
+
+        <button class="nav-btn" data-view="input-review" id="nav-input-review">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+          Input Review
+        </button>
+
+        <div class="nav-label">Artifacts</div>
+
+        <button class="nav-btn" data-view="allocation" id="nav-allocation">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 2a10 10 0 0 1 10 10"/><line x1="12" y1="12" x2="12" y2="2"/><line x1="12" y1="12" x2="22" y2="12"/></svg>
+          Allocation
+        </button>
+
+        <button class="nav-btn" data-view="products" id="nav-products">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+          Products
+        </button>
+
+        <button class="nav-btn" data-view="fullplan" id="nav-fullplan">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+          Full Plan
+        </button>
+
+        <div class="nav-label">Review</div>
+
+        <button class="nav-btn" data-view="gate3" id="nav-gate3">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+          Gate 3
+        </button>
+      </nav>
+
+      <div class="sidebar-footer">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+        System Online — Researcher Agent
+      </div>
+    </aside>
+
+    <!-- ═══ MAIN CONTENT ═══ -->
+    <div class="main">
+      <!-- Top Bar -->
+      <header class="top-bar">
+        <span class="crumb" id="crumb">Overview</span>
+        <div class="client-chip" id="client-chip" style="display:none">
+          <span class="chip-dot"></span>
+          <span id="chip-label">—</span>
+        </div>
+      </header>
+
+      <!-- ─── Guard Screen ─── -->
+      <div id="guard-screen" class="guard" style="display:none">
+        <div class="lock-icon">
+          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+          </svg>
+        </div>
+        <h3>Portal Locked</h3>
+        <p>The Researcher Portal requires <strong>Gate 2</strong> (Analyst Review) to be passed before access is granted.</p>
+        <p style="margin-top:12px;font-size:.78rem;color:var(--text-muted)">The Analyst must complete their review and approve Gate 2 to unlock this portal.</p>
+      </div>
+
+      <!-- ─── No Client Screen ─── -->
+      <div id="no-client-screen" class="guard" style="display:none">
+        <div class="lock-icon">
+          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M16 21v-2a4 4 0 00-4-4H6a4 4 0 00-4-4v2"/><circle cx="9" cy="7" r="4"/>
+          </svg>
+        </div>
+        <h3>No Client Selected</h3>
+        <p>Select a client from the dropdown above or create one in the RM Portal first.</p>
+      </div>
+
+      <!-- ═══ VIEW: OVERVIEW ═══ -->
+      <div class="view active" id="view-overview">
+        <div class="view-hdr">
+          <h1>Overview</h1>
+          <p class="sub">Client context, gate status, and available analysis inputs</p>
+        </div>
+
+        <!-- Client Selector -->
+        <div class="client-sel glass" id="client-selector">
+          <label for="sel-client">Active Client</label>
+          <select id="sel-client" class="fgroup">
+            <option value="">— Select client —</option>
+          </select>
+        </div>
+
+        <!-- Stats -->
+        <div class="stats" id="overview-stats"></div>
+
+        <!-- Gate Status -->
+        <div id="overview-gates"></div>
+
+        <!-- Input Summary -->
+        <div id="overview-inputs"></div>
+      </div>
+
+      <!-- ═══ VIEW: INPUT REVIEW ═══ -->
+      <div class="view" id="view-input-review">
+        <div class="view-hdr">
+          <h1>Input Review</h1>
+          <p class="sub">Read-only view of Analyst outputs — Risk Profile, Goal Gaps, Tax Strategy, Retirement Analysis</p>
+        </div>
+        <div id="input-review-panels"></div>
+      </div>
+
+      <!-- ═══ VIEW: ALLOCATION (10) ═══ -->
+      <div class="view" id="view-allocation">
+        <div class="view-hdr">
+          <h1>Strategic Asset Allocation</h1>
+          <p class="sub">Artifact 10 — Risk-matched allocation bands with goal-horizon bucketing</p>
+        </div>
+
+        <!-- Risk Category Summary -->
+        <div id="alloc-risk-summary"></div>
+
+        <!-- Strategic Allocation Donut -->
+        <div class="card" id="alloc-strategic-card">
+          <h3>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 2a10 10 0 0 1 10 10"/><line x1="12" y1="12" x2="12" y2="2"/><line x1="12" y1="12" x2="22" y2="12"/></svg>
+            Strategic Allocation
+          </h3>
+          <div id="alloc-donut-area"></div>
+        </div>
+
+        <!-- Goal-Horizon Bucketing -->
+        <div class="card" id="alloc-horizon-card">
+          <h3>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+            Goal-Horizon Bucketing
+          </h3>
+          <div id="alloc-horizon-table"></div>
+        </div>
+
+        <div class="form-actions">
+          <button class="btn btn-primary btn-lg" id="btn-gen-10">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+            Generate Artifact 10
+          </button>
+        </div>
+      </div>
+
+      <!-- ═══ VIEW: PRODUCTS (11) ═══ -->
+      <div class="view" id="view-products">
+        <div class="view-hdr">
+          <h1>Product Recommendations</h1>
+          <p class="sub">Artifact 11 — Curated direct-plan products with suitability rationale per SEBI Reg 17</p>
+        </div>
+        <div id="products-list"></div>
+        <div class="form-actions">
+          <button class="btn btn-primary btn-lg" id="btn-gen-11">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+            Generate Artifact 11
+          </button>
+        </div>
+      </div>
+
+      <!-- ═══ VIEW: FULL PLAN (12) ═══ -->
+      <div class="view" id="view-fullplan">
+        <div class="view-hdr">
+          <h1>Comprehensive Plan</h1>
+          <p class="sub">Artifact 12 — Master deliverable compiling all available artifacts into one document</p>
+        </div>
+
+        <!-- Artifact availability check -->
+        <div class="card" id="plan-status-card">
+          <h3>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+            Artifact Availability
+          </h3>
+          <div id="plan-availability"></div>
+        </div>
+
+        <!-- Executive Summary -->
+        <div class="form-card glass">
+          <div class="form-sec">Executive Summary</div>
+          <div class="fgroup full">
+            <label for="plan-exec-summary">Provide a high-level executive summary for the client plan</label>
+            <textarea id="plan-exec-summary" rows="5" placeholder="This comprehensive financial plan has been prepared for [Client Name] to achieve their stated financial goals through a disciplined, risk-appropriate investment strategy…"></textarea>
+          </div>
+        </div>
+
+        <!-- Implementation Notes -->
+        <div class="form-card glass">
+          <div class="form-sec">Implementation Notes</div>
+          <div class="fgroup full">
+            <label for="plan-impl-notes">Specific implementation guidance, SIP dates, account setup steps, etc.</label>
+            <textarea id="plan-impl-notes" rows="5" placeholder="1. Open NPS Tier I account with Auto Choice — LC75 lifecycle fund…"></textarea>
+          </div>
+        </div>
+
+        <div class="form-actions">
+          <button class="btn btn-primary btn-lg" id="btn-gen-12">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+            Generate Artifact 12 — Comprehensive Plan
+          </button>
+          <button class="btn-export" id="btn-export-pdf" style="display:none" onclick="RE.exportPlan()">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            Export as PDF
+          </button>
+        </div>
+      </div>
+
+      <!-- ═══ VIEW: GATE 3 ═══ -->
+      <div class="view" id="view-gate3">
+        <div class="view-hdr">
+          <h1>Gate 3 — Strategic Review</h1>
+          <p class="sub">Verify allocation strategy, product suitability, and SEBI compliance before releasing to RM Phase 2</p>
+        </div>
+        <div id="gate3-content"></div>
+      </div>
+
+    </div><!-- /main -->
+  </div><!-- /portal-layout -->
+
+  <script src="data.js"></script>
+  <script src="researcher.js"></script>
+</body>
+</html>

@@ -1,0 +1,504 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>NeuroFi — Analyst Portal</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="style.css"/>
+  <script src="/dashboard/auth-guard.js" data-required-role="analyst"></script>
+  <style>
+    /* Analyst unique UI style helpers */
+    .analysis-status {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      padding: 6px 14px;
+      border-radius: 20px;
+      margin-bottom: 16px;
+    }
+    .analysis-status.done {
+      background: rgba(16, 185, 129, 0.1);
+      color: #34d399;
+    }
+    .analysis-status.pending {
+      background: rgba(5, 150, 105, 0.1);
+      color: #34d399;
+    }
+    
+    .run-all-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+      margin-top: 20px;
+    }
+    .run-item {
+      background: var(--bg-glass);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-md);
+      padding: 16px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      transition: border-color var(--tr-fast);
+    }
+    .run-item.completed {
+      border-color: #059669;
+    }
+    .run-item .run-icon {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+    .run-item .run-icon.ok {
+      background: rgba(5, 150, 105, 0.15);
+      color: #34d399;
+    }
+    .run-item .run-icon.wait {
+      background: rgba(255, 255, 255, 0.05);
+      color: var(--text-muted);
+    }
+    .run-item .run-label {
+      font-weight: 600;
+      font-size: 0.85rem;
+    }
+    .run-item .run-sub {
+      font-size: 0.7rem;
+      color: var(--text-tertiary);
+    }
+    
+    .section-divider {
+      margin: 24px 0 18px;
+      border: 0;
+      border-top: 1px solid var(--border-subtle);
+    }
+    
+    .results-title {
+      font-family: var(--font-display);
+      font-size: 1.1rem;
+      font-weight: 700;
+      margin-bottom: 14px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .results-title svg {
+      flex-shrink: 0;
+    }
+    
+    .input-artifact {
+      margin-bottom: 18px;
+    }
+    .input-artifact h3 {
+      font-size: 0.95rem;
+      font-weight: 700;
+      margin-bottom: 8px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    
+    .tab-row {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 18px;
+      flex-wrap: wrap;
+    }
+    .tab-btn {
+      padding: 6px 16px;
+      border: 1px solid var(--border-subtle);
+      border-radius: 20px;
+      background: 0;
+      color: var(--text-tertiary);
+      font-family: var(--font);
+      font-size: 0.8rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all var(--tr-fast);
+    }
+    .tab-btn:hover {
+      background: var(--bg-glass-hover);
+      color: var(--text-primary);
+    }
+    .tab-btn.active {
+      background: rgba(5, 150, 105, 0.12);
+      border-color: rgba(5, 150, 105, 0.3);
+      color: #34d399;
+    }
+  </style>
+</head>
+<body class="analyst-portal">
+  <!-- Mesh animated background orbs -->
+  <div class="mesh-bg">
+    <div class="orb orb-1"></div>
+    <div class="orb orb-2"></div>
+    <div class="orb orb-3"></div>
+  </div>
+
+  <div class="portal-layout">
+    <!-- ─── SIDEBAR ─── -->
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-brand">
+        <div class="brand-icon an-bg">A</div>
+        <div class="brand-text">
+          <div class="brand-name">Analyst Portal</div>
+          <div class="brand-tagline">Financial Analyst</div>
+        </div>
+      </div>
+      <nav class="sidebar-nav">
+        <div class="nav-label">Analysis</div>
+        <button class="nav-btn active" id="nav-overview" data-view="overview">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+          Overview
+        </button>
+        <button class="nav-btn" id="nav-inputs" data-view="inputs">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+          Input Review
+        </button>
+
+        <div class="nav-label">Artifacts</div>
+        <button class="nav-btn" id="nav-networth" data-view="networth">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>
+          Net Worth
+        </button>
+        <button class="nav-btn" id="nav-insurance" data-view="insurance">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+          Insurance
+        </button>
+        <button class="nav-btn" id="nav-goals" data-view="goals">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>
+          Goal Gaps
+        </button>
+        <button class="nav-btn" id="nav-tax" data-view="tax">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
+          Tax
+        </button>
+        <button class="nav-btn" id="nav-retirement" data-view="retirement">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+          Retirement
+        </button>
+
+        <div class="nav-label">Workflow</div>
+        <button class="nav-btn" id="nav-runall" data-view="runall">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+          Run All
+        </button>
+        <button class="nav-btn" id="nav-gate2" data-view="gate2">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>
+          Gate 2
+        </button>
+      </nav>
+      <div class="sidebar-footer">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+        SEBI Compliant · Deterministic Math
+      </div>
+    </aside>
+
+    <!-- ─── MAIN ─── -->
+    <div class="main">
+      <header class="top-bar">
+        <span class="crumb" id="crumb">Analyst Portal › Overview</span>
+        <div class="client-chip" id="client-chip" style="display:none">
+          <span class="chip-dot"></span>
+          <span id="chip-label">—</span>
+        </div>
+      </header>
+
+      <!-- ═══ VIEW: OVERVIEW ═══ -->
+      <div class="view active" id="view-overview">
+        <div class="view-hdr">
+          <h1>Analyst Overview</h1>
+          <p class="sub">Select a client and review analysis status</p>
+        </div>
+
+        <!-- Client Selector -->
+        <div class="client-sel glass" id="client-selector">
+          <label>Active Client</label>
+          <select id="sel-client" onchange="AN.onClientChange(this.value)">
+            <option value="">— Select Client —</option>
+          </select>
+        </div>
+
+        <!-- Guard (shown when Gate 1 not passed) -->
+        <div class="guard" id="guard-gate1" style="display:none">
+          <div class="lock-icon">
+            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>
+          </div>
+          <h3>Awaiting Gate 1 Clearance</h3>
+          <p>The RM Portal must complete client intake and pass Gate 1 before analysis can begin.</p>
+        </div>
+
+        <!-- Stats (shown when Gate 1 passed) -->
+        <div id="overview-content" style="display:none">
+          <div class="stats" id="overview-stats">
+            <div class="stat glass">
+              <div class="stat-icon">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+              </div>
+              <div><div class="stat-val" id="stat-artifacts">0/5</div><div class="stat-lbl">Artifacts Generated</div></div>
+            </div>
+            <div class="stat glass">
+              <div class="stat-icon">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>
+              </div>
+              <div><div class="stat-val" id="stat-networth">—</div><div class="stat-lbl">Net Worth</div></div>
+            </div>
+            <div class="stat glass">
+              <div class="stat-icon">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>
+              </div>
+              <div><div class="stat-val" id="stat-goals">0</div><div class="stat-lbl">Goals Mapped</div></div>
+            </div>
+            <div class="stat glass">
+              <div class="stat-icon">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>
+              </div>
+              <div><div class="stat-val" id="stat-gate2">Pending</div><div class="stat-lbl">Gate 2 Status</div></div>
+            </div>
+          </div>
+
+          <!-- Quick summary card -->
+          <div class="card" id="overview-summary">
+            <h3>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 00-4-4H6a4 4 0 00-4-4v2"/><circle cx="9" cy="7" r="4"/></svg>
+              Client Summary
+            </h3>
+            <div class="metrics" id="overview-metrics"></div>
+          </div>
+
+          <!-- Gate cards overview -->
+          <div id="overview-gates"></div>
+        </div>
+      </div>
+
+      <!-- ═══ VIEW: INPUT REVIEW ═══ -->
+      <div class="view" id="view-inputs">
+        <div class="view-hdr">
+          <h1>Input Review</h1>
+          <p class="sub">Read-only view of RM artifacts (01, 03, 04)</p>
+        </div>
+        <div id="inputs-guard" style="display:none">
+          <div class="guard">
+            <div class="lock-icon"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg></div>
+            <h3>Gate 1 Required</h3><p>Waiting for RM to pass Gate 1.</p>
+          </div>
+        </div>
+        <div id="inputs-content" style="display:none">
+          <div class="tab-row">
+            <button class="tab-btn active" onclick="AN.showInputTab('01')">01 — Client Profile</button>
+            <button class="tab-btn" onclick="AN.showInputTab('03')">03 — Financial Snapshot</button>
+            <button class="tab-btn" onclick="AN.showInputTab('04')">04 — Goal Map</button>
+          </div>
+          <div class="input-artifact" id="input-art-01">
+            <div class="artifact-viewer" id="art-viewer-01">No artifact generated yet.</div>
+          </div>
+          <div class="input-artifact" id="input-art-03" style="display:none">
+            <div class="artifact-viewer" id="art-viewer-03">No artifact generated yet.</div>
+          </div>
+          <div class="input-artifact" id="input-art-04" style="display:none">
+            <div class="artifact-viewer" id="art-viewer-04">No artifact generated yet.</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ═══ VIEW: NET WORTH (05) ═══ -->
+      <div class="view" id="view-networth">
+        <div class="view-hdr">
+          <h1>Net Worth & Cash Flow</h1>
+          <p class="sub">Balance sheet, surplus, emergency fund gap</p>
+        </div>
+        <div id="nw-guard" style="display:none">
+          <div class="guard"><div class="lock-icon"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg></div><h3>Gate 1 Required</h3><p>Waiting for RM to pass Gate 1.</p></div>
+        </div>
+        <div id="nw-content" style="display:none">
+          <div class="form-actions" style="margin-bottom:18px">
+            <button class="btn btn-primary" id="btn-run-nw" onclick="AN.runNetWorth()">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+              Run Net Worth Analysis
+            </button>
+          </div>
+          <div id="nw-results"></div>
+        </div>
+      </div>
+
+      <!-- ═══ VIEW: INSURANCE (06) ═══ -->
+      <div class="view" id="view-insurance">
+        <div class="view-hdr">
+          <h1>Insurance & HLV Analysis</h1>
+          <p class="sub">Human Life Value, life cover gap, health cover gap</p>
+        </div>
+        <div id="ins-guard" style="display:none">
+          <div class="guard"><div class="lock-icon"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg></div><h3>Gate 1 Required</h3><p>Waiting for RM to pass Gate 1.</p></div>
+        </div>
+        <div id="ins-content" style="display:none">
+          <div class="form-actions" style="margin-bottom:18px">
+            <button class="btn btn-primary" id="btn-run-ins" onclick="AN.runInsurance()">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+              Run Insurance Analysis
+            </button>
+          </div>
+          <div id="ins-results"></div>
+        </div>
+      </div>
+
+      <!-- ═══ VIEW: GOAL GAPS (07) ═══ -->
+      <div class="view" id="view-goals">
+        <div class="view-hdr">
+          <h1>Goal Gap Analysis</h1>
+          <p class="sub">Future value, earmarked projection, SIP requirement</p>
+        </div>
+        <div id="goal-guard" style="display:none">
+          <div class="guard"><div class="lock-icon"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg></div><h3>Gate 1 Required</h3><p>Waiting for RM to pass Gate 1.</p></div>
+        </div>
+        <div id="goal-content" style="display:none">
+          <div class="form-actions" style="margin-bottom:18px">
+            <button class="btn btn-primary" id="btn-run-goals" onclick="AN.runGoalGaps()">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+              Run Goal Gap Analysis
+            </button>
+          </div>
+          <div id="goal-results"></div>
+        </div>
+      </div>
+
+      <!-- ═══ VIEW: TAX (08) ═══ -->
+      <div class="view" id="view-tax">
+        <div class="view-hdr">
+          <h1>Tax Optimization</h1>
+          <p class="sub">Old vs New regime comparison, FY 2025-26</p>
+        </div>
+        <div id="tax-guard" style="display:none">
+          <div class="guard"><div class="lock-icon"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg></div><h3>Gate 1 Required</h3><p>Waiting for RM to pass Gate 1.</p></div>
+        </div>
+        <div id="tax-content" style="display:none">
+          <div class="form-actions" style="margin-bottom:18px">
+            <button class="btn btn-primary" id="btn-run-tax" onclick="AN.runTax()">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+              Run Tax Analysis
+            </button>
+          </div>
+          <div id="tax-results"></div>
+        </div>
+      </div>
+
+      <!-- ═══ VIEW: RETIREMENT (09) ═══ -->
+      <div class="view" id="view-retirement">
+        <div class="view-hdr">
+          <h1>Retirement Analysis</h1>
+          <p class="sub">Corpus requirement, gap, and required SIP</p>
+        </div>
+        <div id="ret-guard" style="display:none">
+          <div class="guard"><div class="lock-icon"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg></div><h3>Gate 1 Required</h3><p>Waiting for RM to pass Gate 1.</p></div>
+        </div>
+        <div id="ret-content" style="display:none">
+          <div class="form-actions" style="margin-bottom:18px">
+            <button class="btn btn-primary" id="btn-run-ret" onclick="AN.runRetirement()">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+              Run Retirement Analysis
+            </button>
+          </div>
+          <div id="ret-results"></div>
+        </div>
+      </div>
+
+      <!-- ═══ VIEW: RUN ALL ═══ -->
+      <div class="view" id="view-runall">
+        <div class="view-hdr">
+          <h1>Run All Analyses</h1>
+          <p class="sub">Execute all 5 artifact calculations in sequence</p>
+        </div>
+        <div id="runall-guard" style="display:none">
+          <div class="guard"><div class="lock-icon"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg></div><h3>Gate 1 Required</h3><p>Waiting for RM to pass Gate 1.</p></div>
+        </div>
+        <div id="runall-content" style="display:none">
+          <div class="form-actions" style="margin-bottom:18px">
+            <button class="btn btn-primary btn-lg" id="btn-run-all" onclick="AN.runAll()">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+              Run All 5 Analyses
+            </button>
+          </div>
+          <div class="run-all-grid" id="runall-status">
+            <div class="run-item" id="runall-05">
+              <div class="run-icon wait"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/></svg></div>
+              <div><div class="run-label">Net Worth & Cash Flow</div><div class="run-sub">Pending</div></div>
+            </div>
+            <div class="run-item" id="runall-06">
+              <div class="run-icon wait"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/></svg></div>
+              <div><div class="run-label">Insurance & HLV</div><div class="run-sub">Pending</div></div>
+            </div>
+            <div class="run-item" id="runall-07">
+              <div class="run-icon wait"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/></svg></div>
+              <div><div class="run-label">Goal Gap Analysis</div><div class="run-sub">Pending</div></div>
+            </div>
+            <div class="run-item" id="runall-08">
+              <div class="run-icon wait"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/></svg></div>
+              <div><div class="run-label">Tax Optimization</div><div class="run-sub">Pending</div></div>
+            </div>
+            <div class="run-item" id="runall-09" style="grid-column:1/-1">
+              <div class="run-icon wait"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/></svg></div>
+              <div><div class="run-label">Retirement Analysis</div><div class="run-sub">Pending</div></div>
+            </div>
+          </div>
+          <div id="runall-summary" style="margin-top:24px"></div>
+        </div>
+      </div>
+
+      <!-- ═══ VIEW: GATE 2 ═══ -->
+      <div class="view" id="view-gate2">
+        <div class="view-hdr">
+          <h1>Gate 2 — Analyst Review</h1>
+          <p class="sub">Verify all calculations before releasing to Researcher</p>
+        </div>
+        <div id="g2-guard" style="display:none">
+          <div class="guard"><div class="lock-icon"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg></div><h3>Gate 1 Required</h3><p>Waiting for RM to pass Gate 1.</p></div>
+        </div>
+        <div id="g2-content" style="display:none">
+          <div class="gate-card" id="gate2-card">
+            <div class="gate-hdr">
+              <div class="gate-num pending" id="g2-num">2</div>
+              <div>
+                <div class="gate-title">Gate 2 — Release to Researcher</div>
+                <div class="gate-sub">All 4 checks must be verified before approval</div>
+              </div>
+            </div>
+            <ul class="gate-checks" id="g2-checks">
+              <li><div class="chk-box" id="g2-chk-0" onclick="AN.toggleCheck(0)"></div>Emergency fund calculation verified</li>
+              <li><div class="chk-box" id="g2-chk-1" onclick="AN.toggleCheck(1)"></div>HLV present value is realistic</li>
+              <li><div class="chk-box" id="g2-chk-2" onclick="AN.toggleCheck(2)"></div>Goal SIPs and future values correct</li>
+              <li><div class="chk-box" id="g2-chk-3" onclick="AN.toggleCheck(3)"></div>Tax regime recommendation is accurate</li>
+            </ul>
+            <div class="form-actions">
+              <button class="btn btn-success" id="btn-pass-g2" disabled onclick="AN.passGate2()">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+                Approve Gate 2
+              </button>
+            </div>
+          </div>
+          <div id="g2-passed-msg" style="display:none">
+            <div class="card" style="border-color:var(--accent-green)">
+              <h3 style="color:var(--accent-green)">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+                Gate 2 Passed
+              </h3>
+              <p style="color:var(--text-tertiary);font-size:.85rem">All analyst artifacts have been released to the Researcher Portal.</p>
+              <p style="color:var(--text-muted);font-size:.75rem;margin-top:8px" id="g2-timestamp"></p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <script src="data.js"></script>
+  <script src="analyst.js"></script>
+</body>
+</html>

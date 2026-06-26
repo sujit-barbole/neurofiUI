@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { Link } from 'react-router-dom';
 import './LandingPage.css';
 
 const formatRupees = (num: number) =>
@@ -136,6 +137,7 @@ const LandingPage: React.FC = () => {
             <a href="#know-your-risk">Know Your Risk</a>
             <a href="#clarify-your-goals">Clarify Your Goals</a>
             <a href="#fiduciary">Why NeuroFi</a>
+            <Link to="/login" className="btn btn-nav-login">Login</Link>
             <a href="#contact" className="btn btn-nav">Talk to an Advisor</a>
           </div>
 
@@ -158,6 +160,7 @@ const LandingPage: React.FC = () => {
           <a href="#know-your-risk" className="mobile-link" onClick={closeMobileMenu}>Know Your Risk</a>
           <a href="#clarify-your-goals" className="mobile-link" onClick={closeMobileMenu}>Clarify Your Goals</a>
           <a href="#fiduciary" className="mobile-link" onClick={closeMobileMenu}>Fiduciary Difference</a>
+          <Link to="/login" className="mobile-link" onClick={closeMobileMenu}>Login</Link>
         </div>
       </div>
 
@@ -660,6 +663,8 @@ const LandingPage: React.FC = () => {
           <div className="contact-details">
             <p className="cta-reassurance">No products to sell. No obligations. Just an honest assessment of where you stand.</p>
             <p>advisory@neurofi.in | We respond within 4 hours.</p>
+            <p>+91 91136 62144</p>
+            <p>1st Floor, Lakshmi Pura Layout, Devasandra, KR Puram, Bangalore – 560036</p>
           </div>
         </div>
       </section>
@@ -669,6 +674,8 @@ const LandingPage: React.FC = () => {
           <div className="footer-brand">
             <div className="logo">NeuroFi<span className="logo-dot">.</span></div>
             <p>Judgment, not incentives.</p>
+            <p className="footer-contact">+91 91136 62144</p>
+            <p className="footer-contact">1st Floor, Lakshmi Pura Layout, Devasandra, KR Puram, Bangalore – 560036</p>
           </div>
           <div className="footer-links">
             <h4>Navigation</h4>

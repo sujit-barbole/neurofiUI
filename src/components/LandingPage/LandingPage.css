@@ -180,6 +180,20 @@ a {
     color: var(--text-dark);
 }
 
+.btn-nav-login {
+    padding: 10px 20px;
+    border: 1px solid var(--text-secondary);
+    color: var(--text-primary);
+    border-radius: 4px;
+    font-size: 0.9rem;
+    font-weight: 500;
+}
+
+.btn-nav-login:hover {
+    border-color: var(--text-primary);
+    background-color: rgba(255, 255, 255, 0.05);
+}
+
 /* Hamburger Menu */
 .hamburger {
     display: none;
@@ -942,6 +956,13 @@ a {
 
 .footer-brand .logo {
     margin-bottom: 10px;
+}
+
+.footer-contact {
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    margin-bottom: 4px;
+    line-height: 1.5;
 }
 
 .footer-links h4, .footer-social h4 {

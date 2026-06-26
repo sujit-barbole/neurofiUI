@@ -1,0 +1,449 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>NeuroFi — RM Portal</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="style.css"/>
+  <script src="/dashboard/auth-guard.js" data-required-role="rm"></script>
+</head>
+<body class="rm-portal">
+  <!-- Mesh animated background orbs -->
+  <div class="mesh-bg">
+    <div class="orb orb-1"></div>
+    <div class="orb orb-2"></div>
+    <div class="orb orb-3"></div>
+  </div>
+<div class="portal-layout">
+
+  <!-- ═══════════ SIDEBAR ═══════════ -->
+  <aside class="sidebar">
+    <div class="sidebar-brand">
+      <div class="brand-icon rm-bg">R</div>
+      <div class="brand-text">
+        <span class="brand-name">RM Portal</span>
+        <span class="brand-tagline">Relationship Manager</span>
+      </div>
+    </div>
+
+    <nav class="sidebar-nav">
+      <div class="nav-label">Phase 1 — Onboarding</div>
+      <button class="nav-btn active" data-view="overview" id="nav-overview">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+        Overview
+      </button>
+      <button class="nav-btn" data-view="profile" id="nav-profile">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4-4v2"/><circle cx="12" cy="7" r="4"/></svg>
+        Client Profile
+      </button>
+      <button class="nav-btn" data-view="risk" id="nav-risk">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+        Risk Assessment
+      </button>
+      <button class="nav-btn" data-view="financials" id="nav-financials">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>
+        Financials
+      </button>
+      <button class="nav-btn" data-view="goals" id="nav-goals">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>
+        Goal Map
+      </button>
+      <button class="nav-btn" data-view="gate1" id="nav-gate1">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>
+        Gate 1
+      </button>
+
+      <div class="nav-label">Phase 2 — Delivery</div>
+      <button class="nav-btn" data-view="planreview" id="nav-planreview">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+        Plan Review
+      </button>
+      <button class="nav-btn" data-view="delivery" id="nav-delivery">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+        Delivery
+      </button>
+      <button class="nav-btn" data-view="consent" id="nav-consent">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><polyline points="9 12 12 15 16 10"/></svg>
+        Consent
+      </button>
+      <button class="nav-btn" data-view="gate4" id="nav-gate4">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+        Gate 4
+      </button>
+    </nav>
+
+    <div class="sidebar-footer">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+      SEBI RIA Compliant
+    </div>
+  </aside>
+
+  <!-- ═══════════ MAIN ═══════════ -->
+  <div class="main">
+    <header class="top-bar">
+      <span class="crumb" id="crumb">RM Portal / Overview</span>
+      <div class="client-chip" id="client-chip" style="display:none">
+        <span class="chip-dot"></span>
+        <span id="chip-label">—</span>
+      </div>
+    </header>
+
+    <!-- ─── OVERVIEW ─── -->
+    <section class="view active" id="view-overview">
+      <div class="view-hdr">
+        <h1>Overview</h1>
+        <p class="sub">Select or create a client to begin the onboarding journey.</p>
+      </div>
+
+      <div class="client-sel glass" id="client-selector" style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 14px;">
+        <div style="display: flex; align-items: center; gap: 14px; flex-wrap: wrap;">
+          <div class="fgroup">
+            <label>Active Client</label>
+            <select id="sel-client" style="min-width:240px">
+              <option value="">— Select Client —</option>
+            </select>
+          </div>
+          <span style="color:var(--text-muted);font-size:.78rem; margin-top: 20px;">or create a new client in Client Profile tab</span>
+        </div>
+        <button class="btn btn-danger" id="btn-delete-client" style="margin-top: 14px; display: none;">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
+          Delete Client
+        </button>
+      </div>
+
+      <div class="stats" id="overview-stats"></div>
+      <div id="overview-artifacts"></div>
+    </section>
+
+    <!-- ─── CLIENT PROFILE ─── -->
+    <section class="view" id="view-profile">
+      <div class="view-hdr">
+        <h1>Client Profile</h1>
+        <p class="sub">Artifact 01 — Capture KYC demographics and personal details.</p>
+      </div>
+      <form class="form-card glass" id="form-profile" autocomplete="off">
+        <div class="form-sec">Personal Details</div>
+        <div class="frow">
+          <div class="fgroup"><label>First Name *</label><input type="text" id="pf-fname" required/></div>
+          <div class="fgroup"><label>Surname *</label><input type="text" id="pf-lname" required/></div>
+        </div>
+        <div class="frow">
+          <div class="fgroup"><label>Date of Birth *</label><input type="date" id="pf-dob" required/></div>
+          <div class="fgroup"><label>Gender</label>
+            <select id="pf-gender"><option value="">—</option><option>Male</option><option>Female</option><option>Other</option></select>
+          </div>
+        </div>
+        <div class="frow">
+          <div class="fgroup"><label>PAN</label><input type="text" id="pf-pan" maxlength="10" placeholder="ABCDE1234F" style="text-transform:uppercase"/></div>
+          <div class="fgroup"><label>Marital Status</label>
+            <select id="pf-marital"><option value="">—</option><option>Single</option><option>Married</option><option>Divorced</option><option>Widowed</option></select>
+          </div>
+        </div>
+        <div class="frow">
+          <div class="fgroup"><label>City *</label><input type="text" id="pf-city" required/></div>
+          <div class="fgroup"><label>Metro Status</label>
+            <select id="pf-metro"><option>Metro</option><option>Non-Metro</option></select>
+          </div>
+        </div>
+
+        <div class="form-sec">Professional Details</div>
+        <div class="frow">
+          <div class="fgroup"><label>Occupation</label>
+            <select id="pf-occupation">
+              <option value="">—</option>
+              <option>Salaried-Govt</option><option>Salaried-Corporate</option><option>Salaried-Startup</option>
+              <option>Self-Employed</option><option>Business Owner</option><option>Retired</option>
+            </select>
+          </div>
+          <div class="fgroup"><label>Life Stage</label>
+            <select id="pf-lifestage"><option value="">—</option><option>Early Career</option><option>Mid Career</option><option>Pre-Retirement</option><option>Retired</option></select>
+          </div>
+        </div>
+        <div class="frow">
+          <div class="fgroup"><label>Employer</label><input type="text" id="pf-employer"/></div>
+          <div class="fgroup"><label>Designation</label><input type="text" id="pf-designation"/></div>
+        </div>
+
+        <div class="form-sec">Family Details</div>
+        <div class="frow">
+          <div class="fgroup"><label>Spouse Name</label><input type="text" id="pf-spouse"/></div>
+          <div class="fgroup"><label>No. of Dependents</label><input type="number" id="pf-dependents" min="0" value="0"/></div>
+        </div>
+        <div class="frow">
+          <div class="fgroup full"><label>Dependent Details</label><textarea id="pf-depdetails" rows="3" placeholder="e.g. Son (age 5), Daughter (age 8), Mother (age 65)"></textarea></div>
+        </div>
+
+        <div class="form-sec">Contact</div>
+        <div class="frow">
+          <div class="fgroup"><label>Phone</label><input type="tel" id="pf-phone"/></div>
+          <div class="fgroup"><label>Email</label><input type="email" id="pf-email"/></div>
+        </div>
+
+        <div class="form-actions">
+          <button type="submit" class="btn btn-primary btn-lg" id="btn-save-profile">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+            Create Client &amp; Generate Artifact 01
+          </button>
+        </div>
+      </form>
+    </section>
+
+    <!-- ─── RISK ASSESSMENT ─── -->
+    <section class="view" id="view-risk">
+      <div class="view-hdr">
+        <h1>Risk Assessment</h1>
+        <p class="sub">Artifact 02 — 20-Question Scored Risk Profiling Questionnaire.</p>
+      </div>
+
+      <div id="risk-guard"></div>
+
+      <div class="score-header glass" id="risk-score-header">
+        <div class="score-ring">
+          <svg viewBox="0 0 120 120">
+            <circle class="score-track" cx="60" cy="60" r="52"/>
+            <circle class="score-fill" cx="60" cy="60" r="52" id="score-fill-circle"/>
+          </svg>
+          <div class="score-inner">
+            <span class="score-num" id="score-num">0</span>
+            <span class="score-den">/ 100</span>
+          </div>
+        </div>
+        <div class="score-info">
+          <div class="cat-label" id="score-cat">Not Assessed</div>
+          <div class="alloc-preview" id="score-alloc">Answer all 20 questions to see your risk category.</div>
+        </div>
+      </div>
+
+      <div id="risk-questions"></div>
+
+      <div class="form-actions" style="padding:0 0 24px">
+        <button class="btn btn-primary btn-lg" id="btn-save-risk" disabled>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+          Save Risk Profile &amp; Generate Artifact 02
+        </button>
+      </div>
+    </section>
+
+    <!-- ─── FINANCIALS ─── -->
+    <section class="view" id="view-financials">
+      <div class="view-hdr">
+        <h1>Financial Snapshot</h1>
+        <p class="sub">Artifact 03 — Income, Expenses, Assets, Liabilities &amp; Insurance.</p>
+      </div>
+
+      <div id="fin-guard"></div>
+
+      <form class="form-card glass" id="form-financials" autocomplete="off">
+        <div class="form-sec">Monthly Income</div>
+        <div class="frow">
+          <div class="fgroup"><label>Basic Salary (₹/mo)</label><input type="number" id="fi-basic" min="0" value="0"/></div>
+          <div class="fgroup"><label>HRA (₹/mo)</label><input type="number" id="fi-hra" min="0" value="0"/></div>
+        </div>
+        <div class="frow">
+          <div class="fgroup"><label>Special Allowance (₹/mo)</label><input type="number" id="fi-special" min="0" value="0"/></div>
+          <div class="fgroup"><label>Rental Income (₹/mo)</label><input type="number" id="fi-rental" min="0" value="0"/></div>
+        </div>
+        <div class="frow">
+          <div class="fgroup"><label>Dividend/Interest (₹/mo)</label><input type="number" id="fi-dividend" min="0" value="0"/></div>
+          <div class="fgroup"><label>Other Income (₹/mo)</label><input type="number" id="fi-otherinc" min="0" value="0"/></div>
+        </div>
+
+        <div class="form-sec">Monthly Expenses</div>
+        <div class="frow">
+          <div class="fgroup"><label>Housing Rent / EMI</label><input type="number" id="fi-housing" min="0" value="0"/></div>
+          <div class="fgroup"><label>Household &amp; Utilities</label><input type="number" id="fi-household" min="0" value="0"/></div>
+        </div>
+        <div class="frow">
+          <div class="fgroup"><label>Education Fees</label><input type="number" id="fi-education" min="0" value="0"/></div>
+          <div class="fgroup"><label>Healthcare</label><input type="number" id="fi-healthcare" min="0" value="0"/></div>
+        </div>
+        <div class="frow">
+          <div class="fgroup"><label>Lifestyle</label><input type="number" id="fi-lifestyle" min="0" value="0"/></div>
+          <div class="fgroup"><label>Outstanding Loan EMIs</label><input type="number" id="fi-loanemi" min="0" value="0"/></div>
+        </div>
+        <div class="frow">
+          <div class="fgroup"><label>Insurance Premiums</label><input type="number" id="fi-inspremium" min="0" value="0"/></div>
+          <div class="fgroup"><label>Other Expenses</label><input type="number" id="fi-otherexp" min="0" value="0"/></div>
+        </div>
+
+        <div class="form-sec">Current Assets (₹)</div>
+        <div class="frow">
+          <div class="fgroup"><label>Bank Accounts &amp; FDs</label><input type="number" id="fi-bank" min="0" value="0"/></div>
+          <div class="fgroup"><label>Mutual Funds</label><input type="number" id="fi-mf" min="0" value="0"/></div>
+        </div>
+        <div class="frow">
+          <div class="fgroup"><label>Direct Equity</label><input type="number" id="fi-equity" min="0" value="0"/></div>
+          <div class="fgroup"><label>EPF / PPF / SSY</label><input type="number" id="fi-epf" min="0" value="0"/></div>
+        </div>
+        <div class="frow">
+          <div class="fgroup"><label>NPS Tier I</label><input type="number" id="fi-nps" min="0" value="0"/></div>
+          <div class="fgroup"><label>Real Estate (exc. primary)</label><input type="number" id="fi-realestate" min="0" value="0"/></div>
+        </div>
+        <div class="frow">
+          <div class="fgroup"><label>Gold / SGBs</label><input type="number" id="fi-gold" min="0" value="0"/></div>
+          <div class="fgroup"><label>Bundled Policy Surrender Value</label><input type="number" id="fi-surrender" min="0" value="0"/></div>
+        </div>
+
+        <div class="form-sec">Current Liabilities (₹)</div>
+        <div class="frow">
+          <div class="fgroup"><label>Home Loan Outstanding</label><input type="number" id="fi-homeloan" min="0" value="0"/></div>
+          <div class="fgroup"><label>Vehicle Loan</label><input type="number" id="fi-vehicleloan" min="0" value="0"/></div>
+        </div>
+        <div class="frow">
+          <div class="fgroup"><label>Personal / Credit Card</label><input type="number" id="fi-personalloan" min="0" value="0"/></div>
+          <div class="fgroup"><label>Education Loan</label><input type="number" id="fi-eduloan" min="0" value="0"/></div>
+        </div>
+
+        <div class="form-sec">Insurance Coverage</div>
+        <div class="frow">
+          <div class="fgroup"><label>Term Life Sum Assured (₹)</label><input type="number" id="fi-termlife" min="0" value="0"/></div>
+          <div class="fgroup"><label>Term Life Annual Premium (₹)</label><input type="number" id="fi-termpremium" min="0" value="0"/></div>
+        </div>
+        <div class="frow">
+          <div class="fgroup"><label>Health Sum Insured (₹)</label><input type="number" id="fi-healthsi" min="0" value="0"/></div>
+          <div class="fgroup"><label>Bundled Policy Sum Assured (₹)</label><input type="number" id="fi-bundledsa" min="0" value="0"/></div>
+        </div>
+
+        <div class="form-actions">
+          <button type="submit" class="btn btn-primary btn-lg" id="btn-save-financials">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>
+            Save Financials &amp; Generate Artifact 03
+          </button>
+        </div>
+      </form>
+    </section>
+
+    <!-- ─── GOAL MAP ─── -->
+    <section class="view" id="view-goals">
+      <div class="view-hdr">
+        <h1>Goal Map</h1>
+        <p class="sub">Artifact 04 — Map life goals with inflation-adjusted targets and priorities.</p>
+      </div>
+
+      <div id="goals-guard"></div>
+
+      <form class="form-card glass" id="form-goal" autocomplete="off">
+        <div class="form-sec">Add New Goal</div>
+        <div class="frow">
+          <div class="fgroup"><label>Goal Name *</label><input type="text" id="gl-name" required placeholder="e.g. Child's Higher Education"/></div>
+          <div class="fgroup"><label>Priority</label>
+            <select id="gl-priority"><option>Critical</option><option>Important</option><option>Aspirational</option></select>
+          </div>
+        </div>
+        <div class="frow">
+          <div class="fgroup"><label>Time Horizon (years) *</label><input type="number" id="gl-horizon" min="1" max="50" required/></div>
+          <div class="fgroup"><label>Cost in Today's Value (₹) *</label><input type="number" id="gl-cost" min="0" required/></div>
+        </div>
+        <div class="frow">
+          <div class="fgroup"><label>Inflation Category</label>
+            <select id="gl-inflation">
+              <option value="cpi">General CPI — 6%</option>
+              <option value="education">Education — 10%</option>
+              <option value="healthcare">Healthcare — 9%</option>
+              <option value="lifestyle">Lifestyle — 7.5%</option>
+            </select>
+          </div>
+          <div class="fgroup"><label>Flexibility</label>
+            <select id="gl-flexibility"><option>Non-Negotiable</option><option>Negotiable</option></select>
+          </div>
+        </div>
+        <div class="frow">
+          <div class="fgroup"><label>Earmarked Assets (₹)</label><input type="number" id="gl-earmarked" min="0" value="0"/></div>
+          <div class="fgroup"><label>Earmarked Return (%)</label><input type="number" id="gl-earreturn" min="0" max="30" step="0.5" value="0"/></div>
+        </div>
+        <div class="form-actions">
+          <button type="submit" class="btn btn-primary" id="btn-add-goal">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
+            Add Goal
+          </button>
+        </div>
+      </form>
+
+      <div id="goals-list" style="margin-top:12px"></div>
+
+      <div class="form-actions" style="padding:16px 0">
+        <button class="btn btn-success btn-lg" id="btn-save-goals" disabled>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>
+          Save Goal Map &amp; Generate Artifact 04
+        </button>
+      </div>
+    </section>
+
+    <!-- ─── GATE 1 ─── -->
+    <section class="view" id="view-gate1">
+      <div class="view-hdr">
+        <h1>Gate 1 — Release to Analyst</h1>
+        <p class="sub">Verify all Phase 1 artifacts are complete before releasing to the Analyst portal.</p>
+      </div>
+
+      <div id="gate1-guard"></div>
+
+      <div class="gate-card" id="gate1-card">
+        <div class="gate-hdr">
+          <div class="gate-num pending" id="gate1-num">1</div>
+          <div>
+            <div class="gate-title">Phase 1 Completion Gate</div>
+            <div class="gate-sub">All 4 onboarding artifacts must be verified</div>
+          </div>
+        </div>
+        <ul class="gate-checks" id="gate1-checks">
+          <li><div class="chk-box" data-chk="g1c1" id="g1c1"></div> Client profile is complete and verified</li>
+          <li><div class="chk-box" data-chk="g1c2" id="g1c2"></div> Risk questionnaire fully answered (20/20)</li>
+          <li><div class="chk-box" data-chk="g1c3" id="g1c3"></div> Financial snapshot data cross-verified</li>
+          <li><div class="chk-box" data-chk="g1c4" id="g1c4"></div> Goals mapped with inflation and priority</li>
+        </ul>
+        <div class="form-actions" style="margin-top:16px">
+          <button class="btn btn-success btn-lg" id="btn-gate1-approve" disabled>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+            Approve Gate 1 &amp; Release to Analyst
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ─── PLAN REVIEW (Phase 2) ─── -->
+    <section class="view" id="view-planreview">
+      <div class="view-hdr">
+        <h1>Plan Review</h1>
+        <p class="sub">Artifact 12 — Comprehensive plan compiled by the Researcher agent.</p>
+      </div>
+      <div id="planreview-content"></div>
+    </section>
+
+    <!-- ─── DELIVERY (Phase 2) ─── -->
+    <section class="view" id="view-delivery">
+      <div class="view-hdr">
+        <h1>Client Delivery</h1>
+        <p class="sub">Artifact 13 — Implementation roadmap and action items for the client.</p>
+      </div>
+      <div id="delivery-content"></div>
+    </section>
+
+    <!-- ─── CONSENT (Phase 2) ─── -->
+    <section class="view" id="view-consent">
+      <div class="view-hdr">
+        <h1>Client Consent</h1>
+        <p class="sub">Artifact 14 — Capture client acknowledgements and digital consent.</p>
+      </div>
+      <div id="consent-content"></div>
+    </section>
+
+    <!-- ─── GATE 4 ─── -->
+    <section class="view" id="view-gate4">
+      <div class="view-hdr">
+        <h1>Gate 4 — Final Sign-Off</h1>
+        <p class="sub">Complete the advisory cycle and archive for 5-year retention.</p>
+      </div>
+      <div id="gate4-content"></div>
+    </section>
+
+  </div><!-- /main -->
+</div><!-- /portal-layout -->
+
+<script src="data.js"></script>
+<script src="rm.js"></script>
+</body>
+</html>

@@ -17,7 +17,7 @@
   let productRowSeq = 0;
   let catalogCache = null;
 
-  const API_BASE = window.NF_API_BASE || 'http://localhost:8080';
+  const API_BASE = window.NF_API_BASE !== undefined ? window.NF_API_BASE : 'http://localhost:8080';
 
   // ── DOM Helpers ──
   const $ = (sel) => document.querySelector(sel);

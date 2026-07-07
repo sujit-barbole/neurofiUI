@@ -17,7 +17,7 @@
   // Used to decide GET-and-prepopulate vs. just open a blank form (skip the guaranteed-404 GET).
   let clientFlags = { hasProfile: false, hasFinancials: false, hasRiskAssessment: false, hasGoalMap: false };
 
-  const API_BASE = window.NF_API_BASE || 'http://localhost:8080';
+  const API_BASE = window.NF_API_BASE !== undefined ? window.NF_API_BASE : 'http://localhost:8080';
 
   // ── DOM Helpers ──
   const $ = (sel) => document.querySelector(sel);

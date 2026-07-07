@@ -15,7 +15,7 @@ const AN = (() => {
   // From /api/onboarding/search — Input Review only unlocks once all 4 are true.
   let clientFlags = { hasProfile: false, hasFinancials: false, hasRiskAssessment: false, hasGoalMap: false };
 
-  const API_BASE = window.NF_API_BASE || 'http://localhost:8080';
+  const API_BASE = window.NF_API_BASE !== undefined ? window.NF_API_BASE : 'http://localhost:8080';
 
   function isInputReviewReady() {
     return clientFlags.hasProfile && clientFlags.hasFinancials && clientFlags.hasRiskAssessment && clientFlags.hasGoalMap;

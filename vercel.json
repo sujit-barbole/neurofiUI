@@ -3,5 +3,11 @@
   "outputDirectory": "dist",
   "framework": "vite",
   "installCommand": "npm install",
-  "devCommand": "npm run dev"
+  "devCommand": "npm run dev",
+  "rewrites": [
+    {
+      "source": "/api/:path*",
+      "destination": "http://3.7.19.25:8080/api/:path*"
+    }
+  ]
 }

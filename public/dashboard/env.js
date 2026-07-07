@@ -1,14 +1,14 @@
 /**
  * NeuroFi Dashboard — Environment Config
- * Local dev: calls backend directly on localhost:8080.
- * Production (Vercel): uses empty string so all /api/* calls go to Vercel,
- * which proxies them to EC2 via vercel.json rewrites — no mixed-content block.
+ * Local dev + production (non-Vercel): calls EC2 backend directly.
+ * Vercel deployment: empty string so /api/* routes through Vercel proxy
+ * to EC2 server-side (avoids browser mixed-content block).
  */
 (function () {
   if (!window.NF_API_BASE) {
-    var isLocal =
-      window.location.hostname === 'localhost' ||
-      window.location.hostname === '127.0.0.1';
-    window.NF_API_BASE = isLocal ? 'http://localhost:8080' : '';
+    var isVercel = window.location.hostname.endsWith('.vercel.app') ||
+                   window.location.hostname === 'www.neurofi.in' ||
+                   window.location.hostname === 'neurofi.in';
+    window.NF_API_BASE = isVercel ? '' : 'http://3.7.19.25:8080';
   }
 })();

@@ -219,12 +219,16 @@
           <p class="sub">Select a client and review analysis status</p>
         </div>
 
-        <!-- Client Selector -->
-        <div class="client-sel glass" id="client-selector">
-          <label>Active Client</label>
-          <select id="sel-client" onchange="AN.onClientChange(this.value)">
-            <option value="">— Select Client —</option>
-          </select>
+        <!-- Client Search -->
+        <div class="client-sel glass" id="client-selector" style="display: flex; align-items: center; gap: 14px; flex-wrap: wrap;">
+          <div class="fgroup">
+            <label>Client Mobile Number</label>
+            <input type="tel" id="search-client-phone" placeholder="e.g. 8888519719" style="min-width:240px" maxlength="10"/>
+          </div>
+          <button class="btn btn-primary" id="btn-search-client" style="margin-top: 20px;">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            Get Client
+          </button>
         </div>
 
         <!-- Guard (shown when Gate 1 not passed) -->
@@ -293,18 +297,18 @@
         </div>
         <div id="inputs-content" style="display:none">
           <div class="tab-row">
-            <button class="tab-btn active" onclick="AN.showInputTab('01')">01 — Client Profile</button>
-            <button class="tab-btn" onclick="AN.showInputTab('03')">03 — Financial Snapshot</button>
-            <button class="tab-btn" onclick="AN.showInputTab('04')">04 — Goal Map</button>
+            <button class="tab-btn" onclick="AN.showInputTab('01')">01 — Client Profile</button>
+            <button class="tab-btn" onclick="AN.showInputTab('02')">02 — Financial Snapshot</button>
+            <button class="tab-btn" onclick="AN.showInputTab('03')">03 — Goal Map</button>
           </div>
-          <div class="input-artifact" id="input-art-01">
-            <div class="artifact-viewer" id="art-viewer-01">No artifact generated yet.</div>
+          <div class="input-artifact" id="input-art-01" style="display:none">
+            <pre class="artifact-viewer" id="art-viewer-01">No artifact generated yet.</pre>
+          </div>
+          <div class="input-artifact" id="input-art-02" style="display:none">
+            <pre class="artifact-viewer" id="art-viewer-02">No artifact generated yet.</pre>
           </div>
           <div class="input-artifact" id="input-art-03" style="display:none">
-            <div class="artifact-viewer" id="art-viewer-03">No artifact generated yet.</div>
-          </div>
-          <div class="input-artifact" id="input-art-04" style="display:none">
-            <div class="artifact-viewer" id="art-viewer-04">No artifact generated yet.</div>
+            <pre class="artifact-viewer" id="art-viewer-03">No artifact generated yet.</pre>
           </div>
         </div>
       </div>
@@ -316,7 +320,7 @@
           <p class="sub">Balance sheet, surplus, emergency fund gap</p>
         </div>
         <div id="nw-guard" style="display:none">
-          <div class="guard"><div class="lock-icon"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg></div><h3>Gate 1 Required</h3><p>Waiting for RM to pass Gate 1.</p></div>
+          <div class="guard"><div class="lock-icon"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg></div><h3>Client Onboarding Incomplete</h3><p>Profile, Financials, Risk Assessment and Goal Map must all be recorded before this section unlocks.</p></div>
         </div>
         <div id="nw-content" style="display:none">
           <div class="form-actions" style="margin-bottom:18px">
@@ -336,7 +340,7 @@
           <p class="sub">Human Life Value, life cover gap, health cover gap</p>
         </div>
         <div id="ins-guard" style="display:none">
-          <div class="guard"><div class="lock-icon"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg></div><h3>Gate 1 Required</h3><p>Waiting for RM to pass Gate 1.</p></div>
+          <div class="guard"><div class="lock-icon"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg></div><h3>Client Onboarding Incomplete</h3><p>Profile, Financials, Risk Assessment and Goal Map must all be recorded before this section unlocks.</p></div>
         </div>
         <div id="ins-content" style="display:none">
           <div class="form-actions" style="margin-bottom:18px">
@@ -356,7 +360,7 @@
           <p class="sub">Future value, earmarked projection, SIP requirement</p>
         </div>
         <div id="goal-guard" style="display:none">
-          <div class="guard"><div class="lock-icon"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg></div><h3>Gate 1 Required</h3><p>Waiting for RM to pass Gate 1.</p></div>
+          <div class="guard"><div class="lock-icon"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg></div><h3>Client Onboarding Incomplete</h3><p>Profile, Financials, Risk Assessment and Goal Map must all be recorded before this section unlocks.</p></div>
         </div>
         <div id="goal-content" style="display:none">
           <div class="form-actions" style="margin-bottom:18px">
@@ -376,7 +380,7 @@
           <p class="sub">Old vs New regime comparison, FY 2025-26</p>
         </div>
         <div id="tax-guard" style="display:none">
-          <div class="guard"><div class="lock-icon"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg></div><h3>Gate 1 Required</h3><p>Waiting for RM to pass Gate 1.</p></div>
+          <div class="guard"><div class="lock-icon"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg></div><h3>Client Onboarding Incomplete</h3><p>Profile, Financials, Risk Assessment and Goal Map must all be recorded before this section unlocks.</p></div>
         </div>
         <div id="tax-content" style="display:none">
           <div class="form-actions" style="margin-bottom:18px">
@@ -396,7 +400,7 @@
           <p class="sub">Corpus requirement, gap, and required SIP</p>
         </div>
         <div id="ret-guard" style="display:none">
-          <div class="guard"><div class="lock-icon"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg></div><h3>Gate 1 Required</h3><p>Waiting for RM to pass Gate 1.</p></div>
+          <div class="guard"><div class="lock-icon"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg></div><h3>Client Onboarding Incomplete</h3><p>Profile, Financials, Risk Assessment and Goal Map must all be recorded before this section unlocks.</p></div>
         </div>
         <div id="ret-content" style="display:none">
           <div class="form-actions" style="margin-bottom:18px">
@@ -416,7 +420,7 @@
           <p class="sub">Execute all 5 artifact calculations in sequence</p>
         </div>
         <div id="runall-guard" style="display:none">
-          <div class="guard"><div class="lock-icon"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg></div><h3>Gate 1 Required</h3><p>Waiting for RM to pass Gate 1.</p></div>
+          <div class="guard"><div class="lock-icon"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg></div><h3>Client Onboarding Incomplete</h3><p>Profile, Financials, Risk Assessment and Goal Map must all be recorded before this section unlocks.</p></div>
         </div>
         <div id="runall-content" style="display:none">
           <div class="form-actions" style="margin-bottom:18px">
@@ -458,7 +462,7 @@
           <p class="sub">Verify all calculations before releasing to Researcher</p>
         </div>
         <div id="g2-guard" style="display:none">
-          <div class="guard"><div class="lock-icon"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg></div><h3>Gate 1 Required</h3><p>Waiting for RM to pass Gate 1.</p></div>
+          <div class="guard"><div class="lock-icon"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg></div><h3>Client Onboarding Incomplete</h3><p>Profile, Financials, Risk Assessment and Goal Map must all be recorded before this section unlocks.</p></div>
         </div>
         <div id="g2-content" style="display:none">
           <div class="gate-card" id="gate2-card">
@@ -498,6 +502,7 @@
     </div>
   </div>
 
+  <script src="env.js"></script>
   <script src="data.js"></script>
   <script src="analyst.js"></script>
 </body>

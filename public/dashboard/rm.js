@@ -11,6 +11,13 @@
   let riskAnswers = {}; // { questionIndex: score }
   let goals = [];       // Array of goal objects
   let gate1Checks = [false, false, false, false];
+  let isOtpVerified = false; // from /api/onboarding/search status — gates the sidebar
+  let searchedMobile = ''; // mobile number of the currently active (searched) client
+  // Whether each artifact already exists for the active client, from /api/onboarding/search.
+  // Used to decide GET-and-prepopulate vs. just open a blank form (skip the guaranteed-404 GET).
+  let clientFlags = { hasProfile: false, hasFinancials: false, hasRiskAssessment: false, hasGoalMap: false };
+
+  const API_BASE = window.NF_API_BASE || 'http://localhost:8080';
 
   // ── DOM Helpers ──
   const $ = (sel) => document.querySelector(sel);
@@ -42,57 +49,215 @@
     };
     $('#crumb').textContent = `RM Portal / ${labels[viewId] || viewId}`;
     renderCurrentView();
+
+    const onboardingId = NF.getActiveClientId();
+    if (!onboardingId) return;
+
+    // Only GET when the search response said this artifact already exists —
+    // otherwise just open a blank form, skipping a guaranteed-404 request.
+    if (viewId === 'profile') {
+      clientFlags.hasProfile ? loadProfileFromApi(onboardingId) : openBlankProfileForm();
+    } else if (viewId === 'risk') {
+      clientFlags.hasRiskAssessment ? loadRiskFromApi(onboardingId) : openBlankRiskForm();
+    } else if (viewId === 'financials') {
+      clientFlags.hasFinancials ? loadFinancialsFromApi(onboardingId) : openBlankFinancialsForm();
+    } else if (viewId === 'goals') {
+      clientFlags.hasGoalMap ? loadGoalsFromApi(onboardingId) : openBlankGoalsForm();
+    }
   }
 
-  // ── Client Selector ──
-  function populateClientSelector() {
-    const sel = $('#sel-client');
-    if (!sel) return;
-    const clients = NF.getClients();
-    const activeId = NF.getActiveClientId();
+  // ── Profile <-> API enum mapping ──
+  const GENDER_MAP = { Male: 'MALE', Female: 'FEMALE', Other: 'OTHER' };
+  const MARITAL_MAP = { Single: 'SINGLE', Married: 'MARRIED', Divorced: 'DIVORCED', Widowed: 'WIDOWED' };
+  const METRO_MAP = { Metro: 'METRO', 'Non-Metro': 'NON_METRO' };
+  const OCCUPATION_MAP = {
+    'Salaried-Govt': 'SALARIED_GOVT', 'Salaried-Corporate': 'SALARIED_CORPORATE', 'Salaried-Startup': 'SALARIED_STARTUP',
+    'Self-Employed': 'SELF_EMPLOYED', 'Business Owner': 'BUSINESS_OWNER', 'Retired': 'RETIRED'
+  };
+  const LIFESTAGE_MAP = {
+    'Early Career': 'EARLY_CAREER', 'Mid Career': 'MID_CAREER', 'Pre-Retirement': 'PRE_RETIREMENT', 'Retired': 'RETIRED'
+  };
 
-    sel.innerHTML = '<option value="">— Select Client —</option>';
-    clients.forEach(c => {
-      const opt = document.createElement('option');
-      opt.value = c.id;
-      opt.textContent = `${c.id} — ${c.profile.fname} ${c.profile.lname}`;
-      if (c.id === activeId) opt.selected = true;
-      sel.appendChild(opt);
+  function toApiEnum(map, uiValue) {
+    return uiValue ? (map[uiValue] || undefined) : undefined;
+  }
+
+  function fromApiEnum(map, apiValue) {
+    if (!apiValue) return '';
+    const entry = Object.entries(map).find(([, v]) => v === apiValue);
+    return entry ? entry[0] : '';
+  }
+
+  function emptyToUndefined(v) {
+    return v === '' || v === null ? undefined : v;
+  }
+
+  // ── Load Profile (GET /api/customers/{onboardingId}/profile) ──
+  function openBlankProfileForm() {
+    resetProfileForm();
+    setProfileFormMode('create');
+  }
+
+  async function loadProfileFromApi(onboardingId) {
+    try {
+      const res = await fetch(`${API_BASE}/api/customers/${onboardingId}/profile`);
+
+      if (res.status === 404) {
+        openBlankProfileForm();
+        return;
+      }
+
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.message || 'Failed to load client profile.');
+      }
+
+      const data = await res.json();
+      populateProfileFormFromApi(data);
+      setProfileFormMode('update');
+    } catch (err) {
+      NF.toast(err.message || 'Could not reach the server.', 'error');
+    }
+  }
+
+  function resetProfileForm() {
+    const form = $('#form-profile');
+    if (form) form.reset();
+  }
+
+  function setProfileFormMode(mode) {
+    const btn = $('#btn-save-profile');
+    if (!btn) return;
+    btn.innerHTML = mode === 'update'
+      ? `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg> Save Profile &amp; Generate Artifact 01`
+      : `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg> Create Client &amp; Generate Artifact 01`;
+  }
+
+  function populateProfileFormFromApi(p) {
+    $('#pf-fname').value = p.firstName || '';
+    $('#pf-lname').value = p.surname || '';
+    $('#pf-dob').value = p.dateOfBirth || '';
+    $('#pf-gender').value = fromApiEnum(GENDER_MAP, p.gender);
+    $('#pf-pan').value = p.pan || '';
+    $('#pf-marital').value = fromApiEnum(MARITAL_MAP, p.maritalStatus);
+    $('#pf-city').value = p.city || '';
+    $('#pf-metro').value = fromApiEnum(METRO_MAP, p.metroStatus) || 'Metro';
+    $('#pf-occupation').value = fromApiEnum(OCCUPATION_MAP, p.occupation);
+    $('#pf-lifestage').value = fromApiEnum(LIFESTAGE_MAP, p.lifeStage);
+    $('#pf-employer').value = p.employer || '';
+    $('#pf-designation').value = p.designation || '';
+    $('#pf-spouse').value = p.spouseName || '';
+    $('#pf-dependents').value = p.numberOfDependents || 0;
+    $('#pf-depdetails').value = p.dependentDetails || '';
+    $('#pf-phone').value = p.phone || '';
+    $('#pf-email').value = p.email || '';
+  }
+
+  // ── Client Search (by mobile number) ──
+  function setupClientSearch() {
+    const btn = $('#btn-search-client');
+    const input = $('#search-client-phone');
+    if (!btn || !input) return;
+
+    const runSearch = () => searchClientByPhone(input.value.trim());
+    btn.addEventListener('click', runSearch);
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        runSearch();
+      }
     });
   }
 
-  function setupClientSelector() {
-    const sel = $('#sel-client');
-    if (!sel) return;
-    sel.addEventListener('change', () => {
-      NF.setActiveClientId(sel.value);
+  async function searchClientByPhone(mobile) {
+    if (!mobile) {
+      NF.toast('Enter a mobile number to search.', 'error');
+      return;
+    }
+
+    const btn = $('#btn-search-client');
+    if (btn) btn.disabled = true;
+
+    try {
+      const res = await fetch(`${API_BASE}/api/onboarding/search?mobile=${encodeURIComponent(mobile)}`);
+
+      if (res.status === 404) {
+        isOtpVerified = false;
+        searchedMobile = '';
+        clientFlags = { hasProfile: false, hasFinancials: false, hasRiskAssessment: false, hasGoalMap: false };
+        NF.setActiveClientId('');
+        NF.toast('No client found for this mobile number.', 'error');
+        onClientChange();
+        return;
+      }
+
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.message || 'Search failed.');
+      }
+
+      const data = await res.json();
+      isOtpVerified = data.status === 'OTPVerified';
+      searchedMobile = data.mobileNumber || mobile;
+      clientFlags = {
+        hasProfile: !!data.hasProfile,
+        hasFinancials: !!data.hasFinancials,
+        hasRiskAssessment: !!data.hasRiskAssessment,
+        hasGoalMap: !!data.hasGoalMap
+      };
+      NF.setActiveClientId(String(data.onboardingId));
+
+      NF.toast(
+        isOtpVerified
+          ? 'Client found. Onboarding sections unlocked.'
+          : `Client found, but mobile is not OTP-verified yet (status: ${data.status}).`,
+        isOtpVerified ? 'success' : 'info'
+      );
+
       onClientChange();
-    });
+
+      // Pre-populate each section as soon as we know it already has data, so it's
+      // ready even before the RM clicks that tab. Sections with no data yet are left
+      // blank — no point firing a GET that's guaranteed to 404.
+      if (clientFlags.hasProfile) loadProfileFromApi(data.onboardingId);
+      if (clientFlags.hasFinancials) loadFinancialsFromApi(data.onboardingId);
+      if (clientFlags.hasRiskAssessment) loadRiskFromApi(data.onboardingId);
+      if (clientFlags.hasGoalMap) loadGoalsFromApi(data.onboardingId);
+    } catch (err) {
+      isOtpVerified = false;
+      searchedMobile = '';
+      clientFlags = { hasProfile: false, hasFinancials: false, hasRiskAssessment: false, hasGoalMap: false };
+      NF.toast(err.message || 'Could not reach the server.', 'error');
+      onClientChange();
+    } finally {
+      if (btn) btn.disabled = false;
+    }
   }
 
   function onClientChange() {
-    populateClientSelector();
     updateSidebarLocks();
     const client = getActiveClient();
     const chip = $('#client-chip');
     const chipLabel = $('#chip-label');
     const deleteBtn = $('#btn-delete-client');
 
+    const activeId = NF.getActiveClientId();
+
     if (client) {
       chip.style.display = 'flex';
       chipLabel.textContent = `${client.profile.fname} ${client.profile.lname} (${client.id})`;
       if (deleteBtn) deleteBtn.style.display = 'inline-flex';
-      
+
       // Load client profile data into form fields
       loadProfileForm(client.profile);
-      
+
       // Load financials if they exist
       if (client.financials) {
         loadFinancialsForm(client.financials);
       } else {
         $('#form-financials').reset();
       }
-      
+
       // Load goals
       goals = client.goals || [];
       renderGoalsList();
@@ -102,6 +267,17 @@
       renderRiskQuestions();
       updateRiskScoreCircle();
 
+    } else if (activeId && searchedMobile) {
+      chip.style.display = 'flex';
+      chipLabel.textContent = `${searchedMobile} (Onboarding #${activeId})`;
+      if (deleteBtn) deleteBtn.style.display = 'none';
+      $('#form-profile').reset();
+      $('#form-financials').reset();
+      goals = [];
+      riskAnswers = {};
+      renderGoalsList();
+      renderRiskQuestions();
+      updateRiskScoreCircle();
     } else {
       chip.style.display = 'none';
       if (deleteBtn) deleteBtn.style.display = 'none';
@@ -124,20 +300,20 @@
 
   // ── Sidebar Access Controls ──
   function updateSidebarLocks() {
+    const activeId = NF.getActiveClientId();
     const client = getActiveClient();
-    const hasClient = !!client;
-    const g1Passed = hasClient && NF.isGatePassed(client.id, 1);
-    const g3Passed = hasClient && NF.isGatePassed(client.id, 3);
-    const hasDel = hasClient && !!NF.getArtifact(client.id, '13', 'rm');
-    const hasCon = hasClient && !!NF.getArtifact(client.id, '14', 'rm');
+    // Phase 1 onboarding tabs only unlock once /api/onboarding/search confirms status === 'OTPVerified'
+    const unlocked = !!activeId && isOtpVerified;
+    const g3Passed = !!client && NF.isGatePassed(client.id, 3);
+    const hasDel = !!client && !!NF.getArtifact(client.id, '13', 'rm');
+    const hasCon = !!client && !!NF.getArtifact(client.id, '14', 'rm');
 
-    // Onboarding Phase (needs client)
     $$('.nav-btn').forEach(btn => {
       const view = btn.dataset.view;
-      if (view === 'overview' || view === 'profile') {
+      if (view === 'overview') {
         btn.classList.remove('locked');
-      } else if (['risk', 'financials', 'goals', 'gate1'].includes(view)) {
-        btn.classList.toggle('locked', !hasClient);
+      } else if (['profile', 'risk', 'financials', 'goals', 'gate1'].includes(view)) {
+        btn.classList.toggle('locked', !unlocked);
       } else if (['planreview', 'delivery'].includes(view)) {
         btn.classList.toggle('locked', !g3Passed);
       } else if (view === 'consent') {
@@ -151,17 +327,23 @@
   // ── Render Views ──
   function renderCurrentView() {
     const client = getActiveClient();
-    
+    const onboardingId = NF.getActiveClientId();
+
     // Hide guards by default
     hideAllGuards();
 
     if (activeView === 'overview') {
       renderOverview(client);
-    } else if (['risk', 'financials', 'goals', 'gate1'].includes(activeView)) {
+    } else if (['risk', 'financials', 'goals'].includes(activeView)) {
+      // These sections are backend-driven (keyed by onboardingId), not the local NF client object.
+      if (!onboardingId) {
+        showGuard(activeView, 'No Client Selected', 'Search for a client by mobile number from the Overview tab first.');
+      }
+    } else if (activeView === 'gate1') {
       if (!client) {
         showGuard(activeView, 'No Client Selected', 'Select a client from the Overview tab or create a new client profile first.');
       } else {
-        if (activeView === 'gate1') renderGate1(client);
+        renderGate1(client);
       }
     } else if (['planreview', 'delivery', 'consent', 'gate4'].includes(activeView)) {
       if (!client) {
@@ -260,12 +442,15 @@
     const artsContainer = $('#overview-artifacts');
 
     if (!client) {
+      const activeId = NF.getActiveClientId();
+      const title = activeId ? 'Mobile Number Not OTP-Verified' : 'No Active Client';
+      const desc = activeId
+        ? 'This client was found, but their mobile number has not completed OTP verification yet. Ask the client to verify their number in the app, then search again.'
+        : 'Enter a client\'s mobile number above and click <strong>Get Client</strong> to begin.';
       statsContainer.innerHTML = `
         <div class="card" style="grid-column: 1/-1; text-align: center; padding: 40px;">
-          <h3 style="justify-content: center; color: var(--text-tertiary);">No Active Client Selected</h3>
-          <p style="color: var(--text-muted); font-size: .85rem; margin-top: 8px;">
-            Please select an existing client above, or go to the <strong>Client Profile</strong> tab to register a new client.
-          </p>
+          <h3 style="justify-content: center; color: var(--text-tertiary);">${title}</h3>
+          <p style="color: var(--text-muted); font-size: .85rem; margin-top: 8px;">${desc}</p>
         </div>
       `;
       artsContainer.innerHTML = '';
@@ -367,49 +552,61 @@
     const form = $('#form-profile');
     if (!form) return;
 
-    form.addEventListener('submit', (e) => {
+    form.addEventListener('submit', async (e) => {
       e.preventDefault();
 
-      const profile = {
-        fname: $('#pf-fname').value,
-        lname: $('#pf-lname').value,
-        dob: $('#pf-dob').value,
-        gender: $('#pf-gender').value,
-        pan: $('#pf-pan').value.toUpperCase(),
-        marital: $('#pf-marital').value,
-        city: $('#pf-city').value,
-        metro: $('#pf-metro').value,
-        occupation: $('#pf-occupation').value,
-        lifestage: $('#pf-lifestage').value,
-        employer: $('#pf-employer').value,
-        designation: $('#pf-designation').value,
-        spouse: $('#pf-spouse').value,
-        dependents: parseInt($('#pf-dependents').value || 0),
-        depdetails: $('#pf-depdetails').value,
-        phone: $('#pf-phone').value,
-        email: $('#pf-email').value
-      };
-
-      const client = getActiveClient();
-      let savedClient;
-
-      if (client) {
-        // Update existing client
-        savedClient = NF.updateClient(client.id, { profile });
-        NF.toast(`Client ${client.id} profile updated.`, 'success');
-      } else {
-        // Create new client
-        savedClient = NF.createClient(profile);
-        NF.setActiveClientId(savedClient.id);
-        NF.toast(`New client created: ${savedClient.id}`, 'success');
+      const onboardingId = NF.getActiveClientId();
+      if (!onboardingId) {
+        NF.toast('Search for a client by mobile number first.', 'error');
+        return;
       }
 
-      // Generate Artifact 01 Markdown
-      const art01MD = generateArtifact01MD(savedClient);
-      NF.setArtifact(savedClient.id, '01', art01MD, 'rm');
+      const payload = {
+        firstName: $('#pf-fname').value.trim(),
+        surname: $('#pf-lname').value.trim(),
+        dateOfBirth: $('#pf-dob').value,
+        gender: toApiEnum(GENDER_MAP, $('#pf-gender').value),
+        pan: emptyToUndefined($('#pf-pan').value.toUpperCase()),
+        maritalStatus: toApiEnum(MARITAL_MAP, $('#pf-marital').value),
+        city: $('#pf-city').value.trim(),
+        metroStatus: toApiEnum(METRO_MAP, $('#pf-metro').value),
+        occupation: toApiEnum(OCCUPATION_MAP, $('#pf-occupation').value),
+        lifeStage: toApiEnum(LIFESTAGE_MAP, $('#pf-lifestage').value),
+        employer: emptyToUndefined($('#pf-employer').value),
+        designation: emptyToUndefined($('#pf-designation').value),
+        spouseName: emptyToUndefined($('#pf-spouse').value),
+        numberOfDependents: parseInt($('#pf-dependents').value || '0', 10),
+        dependentDetails: emptyToUndefined($('#pf-depdetails').value),
+        phone: emptyToUndefined($('#pf-phone').value),
+        email: emptyToUndefined($('#pf-email').value)
+      };
 
-      onClientChange();
-      switchView('overview');
+      const btn = $('#btn-save-profile');
+      if (btn) btn.disabled = true;
+
+      try {
+        const res = await fetch(`${API_BASE}/api/customers/${onboardingId}/profile`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+
+        if (!res.ok) {
+          const body = await res.json().catch(() => ({}));
+          throw new Error(body.message || 'Failed to save client profile.');
+        }
+
+        const saved = await res.json();
+        populateProfileFormFromApi(saved);
+        setProfileFormMode('update');
+        clientFlags.hasProfile = true;
+        NF.toast(`Client profile saved for Onboarding #${onboardingId}.`, 'success');
+        switchView('overview');
+      } catch (err) {
+        NF.toast(err.message || 'Could not reach the server.', 'error');
+      } finally {
+        if (btn) btn.disabled = false;
+      }
     });
   }
 
@@ -438,53 +635,6 @@
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
       Save Profile &amp; Generate Artifact 01
     `;
-  }
-
-  function generateArtifact01MD(client) {
-    const p = client.profile;
-    const ts = new Date().toISOString();
-    return `# Artifact 01 — Client Profile
-**Fiduciary KYC Intake & Demographics Record**
-
-- **Client ID:** ${client.id}
-- **Recorded On:** ${NF.fmtDate(ts)}
-- **Fiduciary Adviser:** SEBI Registered Investment Adviser
-
-## Demographics & Personal Info
-| Field | Value |
-| :--- | :--- |
-| **First Name** | ${p.fname} |
-| **Surname** | ${p.lname} |
-| **Date of Birth** | ${p.dob} |
-| **Gender** | ${p.gender || '—'} |
-| **PAN Number** | ${p.pan || '—'} |
-| **Marital Status** | ${p.marital || '—'} |
-| **City** | ${p.city} |
-| **Metro Status** | ${p.metro} |
-
-## Professional Profile
-| Field | Value |
-| :--- | :--- |
-| **Occupation** | ${p.occupation || '—'} |
-| **Life Stage** | ${p.lifestage || '—'} |
-| **Employer** | ${p.employer || '—'} |
-| **Designation** | ${p.designation || '—'} |
-
-## Family Structure
-| Field | Value |
-| :--- | :--- |
-| **Spouse Name** | ${p.spouse || '—'} |
-| **Number of Dependents**| ${p.dependents} |
-| **Dependent Details** | ${p.depdetails || '—'} |
-
-## Contact Info
-| Field | Value |
-| :--- | :--- |
-| **Phone Number** | ${p.phone || '—'} |
-| **Email Address** | ${p.email || '—'} |
-
----
-*Fiduciary Notice: In compliance with SEBI Investment Advisers Regulations (Regulation 19), this onboarding record is preserved securely in the five-year client compliance vault.*`;
   }
 
   // ═══════════════════════════════════════════
@@ -563,13 +713,47 @@
     }
   }
 
+  function openBlankRiskForm() {
+    riskAnswers = {};
+    renderRiskQuestions();
+    updateRiskScoreCircle();
+  }
+
+  // ── Load Risk Assessment (GET /api/customers/{onboardingId}/risk-assessment) ──
+  async function loadRiskFromApi(onboardingId) {
+    try {
+      const res = await fetch(`${API_BASE}/api/customers/${onboardingId}/risk-assessment`);
+
+      if (res.status === 404) {
+        openBlankRiskForm();
+        return;
+      }
+
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.message || 'Failed to load risk assessment.');
+      }
+
+      const data = await res.json();
+      riskAnswers = {};
+      (data.answers || []).forEach(a => {
+        const idx = NF.RISK_QUESTIONS.findIndex(q => q.code === a.questionCode);
+        if (idx !== -1) riskAnswers[idx] = a.score;
+      });
+      renderRiskQuestions();
+      updateRiskScoreCircle();
+    } catch (err) {
+      NF.toast(err.message || 'Could not reach the server.', 'error');
+    }
+  }
+
   function setupRiskForm() {
     const btn = $('#btn-save-risk');
     if (!btn) return;
 
-    btn.addEventListener('click', () => {
-      const client = getActiveClient();
-      if (!client) return;
+    btn.addEventListener('click', async () => {
+      const onboardingId = NF.getActiveClientId();
+      if (!onboardingId) return;
 
       const answeredCount = Object.keys(riskAnswers).length;
       if (answeredCount < NF.RISK_QUESTIONS.length) {
@@ -577,74 +761,79 @@
         return;
       }
 
-      const totalScore = Object.values(riskAnswers).reduce((a, b) => a + b, 0);
-      const catData = NF.scoreToCategory(totalScore);
+      const answers = NF.RISK_QUESTIONS.map((q, idx) => ({ questionCode: q.code, score: riskAnswers[idx] }));
 
-      // Save to client context
-      NF.updateClient(client.id, c => {
-        c.riskAnswers = riskAnswers;
-        c.riskScore = totalScore;
-        c.riskCategory = catData.cat;
-      });
+      btn.disabled = true;
+      try {
+        const res = await fetch(`${API_BASE}/api/customers/${onboardingId}/risk-assessment`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ answers })
+        });
 
-      // Generate Artifact 02 Markdown
-      const art02MD = generateArtifact02MD(client, totalScore, catData);
-      NF.setArtifact(client.id, '02', art02MD, 'rm');
+        if (!res.ok) {
+          const body = await res.json().catch(() => ({}));
+          throw new Error(body.message || 'Failed to save risk assessment.');
+        }
 
-      NF.toast('Artifact 02 — Risk Profile generated successfully!', 'success');
-      onClientChange();
-      switchView('overview');
+        const saved = await res.json();
+        clientFlags.hasRiskAssessment = true;
+        NF.toast(`Risk Profile saved — ${saved.riskCategory} (${saved.totalScore}/100).`, 'success');
+        switchView('overview');
+      } catch (err) {
+        NF.toast(err.message || 'Could not reach the server.', 'error');
+      } finally {
+        btn.disabled = false;
+      }
     });
-  }
-
-  function generateArtifact02MD(client, score, catData) {
-    const ts = new Date().toISOString();
-    
-    // Dimension breakdowns
-    let cap = 0, tol = 0, per = 0;
-    NF.RISK_QUESTIONS.forEach((q, idx) => {
-      const val = riskAnswers[idx] || 0;
-      if (q.dim === 'capacity') cap += val;
-      else if (q.dim === 'tolerance') tol += val;
-      else if (q.dim === 'perception') per += val;
-    });
-
-    return `# Artifact 02 — Risk Profile
-**Fiduciary Scored Risk Capacity, Tolerance & Perception Assessment**
-
-- **Client ID:** ${client.id}
-- **Assessed On:** ${NF.fmtDate(ts)}
-- **Fiduciary Adviser:** SEBI Registered Investment Adviser
-- **Risk Score:** ${score} / 100
-- **Risk Class Category:** **${catData.cat}**
-
-## Multi-Dimensional Score Breakdown
-| Dimension | Achieved Score | Max Score | Weight % | Fiduciary Rationale |
-| :--- | :---: | :---: | :---: | :--- |
-| **Risk Capacity** | ${cap} | 35 | 35% | Evaluates age, income stability, dependents, and capital availability. |
-| **Risk Tolerance**| ${tol} | 35 | 35% | Evaluates emotional comfort with volatility and market downcycles. |
-| **Risk Perception**| ${per} | 30 | 30% | Evaluates financial literacy, diversification grasp, and inflation concepts. |
-| **Aggregate Score**| **${score}** | **100** | **100%** | **Fiduciary match with strategic allocation targets.** |
-
-## Target Asset Allocation Strategy
-| Asset Class | Recommended Weight | Tactical Rebalancing Range | Core Purpose |
-| :--- | :---: | :---: | :--- |
-| **Equity** | ${catData.eq}% | +/- 5% | Long-term inflation compounding engine. |
-| **Debt** | ${catData.debt}% | +/- 5% | Capital preservation & emergency liquidity anchor. |
-| **Gold** | ${catData.gold}% | +/- 2.5% | Inflation hedge & systematic down-draw cushion. |
-
-## Dimension Analysis & Suitability Mandate
-1. **Risk Capacity Analysis:** With a capacity score of **${cap}/35**, the client possesses a **${cap > 24 ? 'High' : cap > 14 ? 'Moderate' : 'Conservative'}** ability to absorb investment losses based on demographic structure.
-2. **Risk Tolerance Analysis:** Emotional tolerance scored **${tol}/35**. The adviser will avoid volatile options, small-cap concentration, or leveraged products if this score indicates anxiety, irrespective of high capacity.
-3. **Risk Perception Analysis:** Scoring **${per}/30** in financial intelligence. The client shows **${per > 20 ? 'Thorough' : per > 11 ? 'Moderate' : 'Basic'}** understanding of financial concepts, meaning regular education on inflation and fee-drag must be conducted.
-
----
-*Fiduciary Sign-Off: Under SEBI RIA Regs (Schedule III - Code of Conduct), this risk score forms the absolute binding threshold for all downstream asset allocation and product recommendations.*`;
   }
 
   // ═══════════════════════════════════════════
   //  VIEW: FINANCIALS (Artifact 03)
   // ═══════════════════════════════════════════
+
+  // UI input id suffix (after "fi-") -> API field name
+  const FINANCIALS_FIELD_MAP = {
+    basic: 'incomeBasic', hra: 'incomeHra', special: 'incomeSpecial', rental: 'incomeRental',
+    dividend: 'incomeDividend', otherinc: 'incomeOther',
+    housing: 'expHousing', household: 'expHousehold', education: 'expEducation', healthcare: 'expHealthcare',
+    lifestyle: 'expLifestyle', loanemi: 'expLoanEmi', inspremium: 'expInsurancePremium', otherexp: 'expOther',
+    bank: 'assetBank', mf: 'assetMf', equity: 'assetEquity', epf: 'assetEpf', nps: 'assetNps',
+    realestate: 'assetRealEstate', gold: 'assetGold', surrender: 'assetSurrenderValue',
+    homeloan: 'liabHomeLoan', vehicleloan: 'liabVehicleLoan', personalloan: 'liabPersonalLoan', eduloan: 'liabEducationLoan',
+    termlife: 'insTermLifeSumAssured', termpremium: 'insTermLifePremium', healthsi: 'insHealthSumInsured', bundledsa: 'insBundledSumAssured'
+  };
+
+  function openBlankFinancialsForm() {
+    const form = $('#form-financials');
+    if (form) form.reset();
+  }
+
+  // ── Load Financials (GET /api/customers/{onboardingId}/financials) ──
+  async function loadFinancialsFromApi(onboardingId) {
+    try {
+      const res = await fetch(`${API_BASE}/api/customers/${onboardingId}/financials`);
+
+      if (res.status === 404) {
+        openBlankFinancialsForm();
+        return;
+      }
+
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.message || 'Failed to load financials.');
+      }
+
+      const data = await res.json();
+      Object.entries(FINANCIALS_FIELD_MAP).forEach(([uiSuffix, apiField]) => {
+        const input = $(`#fi-${uiSuffix}`);
+        if (input) input.value = data[apiField] || 0;
+      });
+    } catch (err) {
+      NF.toast(err.message || 'Could not reach the server.', 'error');
+    }
+  }
+
   function loadFinancialsForm(f) {
     if (!f) return;
     // Income
@@ -692,221 +881,158 @@
     const form = $('#form-financials');
     if (!form) return;
 
-    form.addEventListener('submit', (e) => {
+    form.addEventListener('submit', async (e) => {
       e.preventDefault();
-      const client = getActiveClient();
-      if (!client) return;
+      const onboardingId = NF.getActiveClientId();
+      if (!onboardingId) {
+        NF.toast('Search for a client by mobile number first.', 'error');
+        return;
+      }
 
-      const financials = {
-        income: {
-          basic: parseFloat($('#fi-basic').value || 0),
-          hra: parseFloat($('#fi-hra').value || 0),
-          special: parseFloat($('#fi-special').value || 0),
-          rental: parseFloat($('#fi-rental').value || 0),
-          dividend: parseFloat($('#fi-dividend').value || 0),
-          otherinc: parseFloat($('#fi-otherinc').value || 0)
-        },
-        expenses: {
-          housing: parseFloat($('#fi-housing').value || 0),
-          household: parseFloat($('#fi-household').value || 0),
-          education: parseFloat($('#fi-education').value || 0),
-          healthcare: parseFloat($('#fi-healthcare').value || 0),
-          lifestyle: parseFloat($('#fi-lifestyle').value || 0),
-          loanemi: parseFloat($('#fi-loanemi').value || 0),
-          inspremium: parseFloat($('#fi-inspremium').value || 0),
-          otherexp: parseFloat($('#fi-otherexp').value || 0)
-        },
-        assets: {
-          bank: parseFloat($('#fi-bank').value || 0),
-          mf: parseFloat($('#fi-mf').value || 0),
-          equity: parseFloat($('#fi-equity').value || 0),
-          epf: parseFloat($('#fi-epf').value || 0),
-          nps: parseFloat($('#fi-nps').value || 0),
-          realestate: parseFloat($('#fi-realestate').value || 0),
-          gold: parseFloat($('#fi-gold').value || 0),
-          surrender: parseFloat($('#fi-surrender').value || 0)
-        },
-        liabilities: {
-          homeloan: parseFloat($('#fi-homeloan').value || 0),
-          vehicleloan: parseFloat($('#fi-vehicleloan').value || 0),
-          personalloan: parseFloat($('#fi-personalloan').value || 0),
-          eduloan: parseFloat($('#fi-eduloan').value || 0)
-        },
-        insurance: {
-          termlife: parseFloat($('#fi-termlife').value || 0),
-          termpremium: parseFloat($('#fi-termpremium').value || 0),
-          healthsi: parseFloat($('#fi-healthsi').value || 0),
-          bundledsa: parseFloat($('#fi-bundledsa').value || 0)
+      const payload = {};
+      Object.entries(FINANCIALS_FIELD_MAP).forEach(([uiSuffix, apiField]) => {
+        const input = $(`#fi-${uiSuffix}`);
+        payload[apiField] = parseFloat((input && input.value) || '0');
+      });
+
+      const btn = $('#btn-save-financials');
+      if (btn) btn.disabled = true;
+
+      try {
+        const res = await fetch(`${API_BASE}/api/customers/${onboardingId}/financials`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+
+        if (!res.ok) {
+          const body = await res.json().catch(() => ({}));
+          throw new Error(body.message || 'Failed to save financials.');
         }
-      };
 
-      NF.updateClient(client.id, { financials });
-
-      // Generate Artifact 03 Markdown
-      const art03MD = generateArtifact03MD(client, financials);
-      NF.setArtifact(client.id, '03', art03MD, 'rm');
-
-      NF.toast('Artifact 03 — Financial Snapshot generated successfully!', 'success');
-      onClientChange();
-      switchView('overview');
+        const saved = await res.json();
+        clientFlags.hasFinancials = true;
+        NF.toast(`Financials saved — Net Worth ${NF.fmt(saved.netWorth)}, Monthly Surplus ${NF.fmt(saved.monthlySurplus)}.`, 'success');
+        switchView('overview');
+      } catch (err) {
+        NF.toast(err.message || 'Could not reach the server.', 'error');
+      } finally {
+        if (btn) btn.disabled = false;
+      }
     });
   }
 
-  function generateArtifact03MD(client, f) {
-    const ts = new Date().toISOString();
-    
-    // Sums
-    const incSum = Object.values(f.income).reduce((a, b) => a + b, 0);
-    const expSum = Object.values(f.expenses).reduce((a, b) => a + b, 0);
-    const assetSum = Object.values(f.assets).reduce((a, b) => a + b, 0);
-    const liabSum = Object.values(f.liabilities).reduce((a, b) => a + b, 0);
-    const surplus = incSum - expSum;
-
-    return `# Artifact 03 — Financial Snapshot
-**Comprehensive Income, Expenses, Assets, Liabilities & Protection Records**
-
-- **Client ID:** ${client.id}
-- **Compiled On:** ${NF.fmtDate(ts)}
-- **Fiduciary Adviser:** SEBI Registered Investment Adviser
-
-## Cash Flow Ledger
-### Monthly Inflows (Income)
-| Ledger Item | Monthly Value | Annualized |
-| :--- | :---: | :---: |
-| Basic Salary | ${NF.fmt(f.income.basic)} | ${NF.fmt(f.income.basic * 12)} |
-| House Rent Allowance (HRA) | ${NF.fmt(f.income.hra)} | ${NF.fmt(f.income.hra * 12)} |
-| Special Allowance | ${NF.fmt(f.income.special)} | ${NF.fmt(f.income.special * 12)} |
-| Rental Income | ${NF.fmt(f.income.rental)} | ${NF.fmt(f.income.rental * 12)} |
-| Dividends / Interest Income | ${NF.fmt(f.income.dividend)} | ${NF.fmt(f.income.dividend * 12)} |
-| Other Secondary Inflows | ${NF.fmt(f.income.otherinc)} | ${NF.fmt(f.income.otherinc * 12)} |
-| **Total Inflow (A)** | **${NF.fmt(incSum)}** | **${NF.fmt(incSum * 12)}** |
-
-### Monthly Outflows (Expenses)
-| Expense Category | Monthly Cost | Rationale |
-| :--- | :---: | :--- |
-| Housing Rent / EMI | ${NF.fmt(f.expenses.housing)} | Housing cost baseline |
-| Household groc & utilities | ${NF.fmt(f.expenses.household)} | Core survival essentials |
-| Education Tuition Fees | ${NF.fmt(f.expenses.education)} | Family human capital funding |
-| Healthcare costs | ${NF.fmt(f.expenses.healthcare)} | Out-of-pocket medical baseline |
-| Lifestyle & Discretionary | ${NF.fmt(f.expenses.lifestyle)} | Discretionary consumption spend |
-| Outstanding Loan EMIs | ${NF.fmt(f.expenses.loanemi)} | Obligated debt services |
-| Insurance Premiums | ${NF.fmt(f.expenses.inspremium)} | Protection cost amortized |
-| Miscellaneous secondary cost | ${NF.fmt(f.expenses.otherexp)} | Contingency cushion |
-| **Total Outflow (B)** | **${NF.fmt(expSum)}** | **Total cost drag** |
-
-### Fiduciary Cash Flow Summary
-- **Gross Monthly Income:** ${NF.fmt(incSum)}
-- **Total Monthly Expenses:** ${NF.fmt(expSum)}
-- **Monthly Net Surplus:** **${NF.fmt(surplus)}** (Savings Rate: **${(surplus/incSum*100).toFixed(1)}%**)
-
-## Balance Sheet Statement
-### Asset Ledger (Current Appraised Value)
-| Asset Class | Value | Core Purpose / Liquidity Rank |
-| :--- | :---: | :--- |
-| Cash & Bank Deposits | ${NF.fmt(f.assets.bank)} | High (Emergency fund anchor) |
-| Mutual Funds (Direct Only) | ${NF.fmt(f.assets.mf)} | High (Liquid growth engine) |
-| Direct Indian Equities | ${NF.fmt(f.assets.equity)} | High (Tactical growth sleeve) |
-| Retirement Funds (EPF/PPF) | ${NF.fmt(f.assets.epf)} | Medium (Guaranteed tax-free retirement) |
-| National Pension System (NPS) | ${NF.fmt(f.assets.nps)} | Low (Retirement locked-in tax sleeve) |
-| Secondary Real Estate | ${NF.fmt(f.assets.realestate)} | Very Low (Physical real asset) |
-| Sovereign Gold Bonds / Gold | ${NF.fmt(f.assets.gold)} | Medium (Systemic inflation hedge) |
-| Bundled Policy Surrender | ${NF.fmt(f.assets.surrender)} | Low (Sub-optimal savings surrender) |
-| **Total Asset Base (C)** | **${NF.fmt(assetSum)}** | **Appraised Wealth Baseline** |
-
-### Liability Ledger (Total Outstanding Debt)
-| Outstanding Debt Item | Value | Annual EMI | Net Interest Drag (Est) |
-| :--- | :---: | :---: | :---: |
-| Home Mortgage Outstanding | ${NF.fmt(f.liabilities.homeloan)} | ${NF.fmt(f.expenses.housing * 12)} | 8.75% avg |
-| Vehicle Loans | ${NF.fmt(f.liabilities.vehicleloan)} | — | 9.50% avg |
-| Credit Cards & Personal Debt | ${NF.fmt(f.liabilities.personalloan)} | — | 18.00%+ high drag |
-| Education Loans | ${NF.fmt(f.liabilities.eduloan)} | — | 10.00% avg |
-| **Total Liabilities (D)** | **${NF.fmt(liabSum)}** | **—** | **Aggregated Debt Liability** |
-
-### Net Appraised Worth
-- **Aggregate Asset Base:** ${NF.fmt(assetSum)}
-- **Aggregate Outstanding Debt:** ${NF.fmt(liabSum)}
-- **Net Wealth Appraisal:** **${NF.fmt(assetSum - liabSum)}**
-
-## Protection Portfolio (Insurance Audit)
-| Coverage Parameter | Sum Assured (SA) | Premium Outlay (Annual) | Status Code |
-| :--- | :---: | :---: | :--- |
-| **Pure Term Life Cover** | ${NF.fmt(f.insurance.termlife)} | ${NF.fmt(f.insurance.termpremium)} | Active protection |
-| **Family Floater Health Cover**| ${NF.fmt(f.insurance.healthsi)} | Included above | Active protection |
-| **Traditional Bundled SA** | ${NF.fmt(f.insurance.bundledsa)} | Included above | High drag savings SA |
-
----
-*Fiduciary Verification: Raw verification documents (Salary slips, Form 16, Bank statements, CAS Mutual Fund statements, insurance policies) are locked under the 5-year compliance repository tracking protocols.*`;
-  }
 
   // ═══════════════════════════════════════════
   //  VIEW: GOAL MAP (Artifact 04)
   // ═══════════════════════════════════════════
+
+  const PRIORITY_MAP = { Critical: 'CRITICAL', Important: 'IMPORTANT', Aspirational: 'ASPIRATIONAL' };
+  const INFLATION_MAP = { cpi: 'CPI', education: 'EDUCATION', healthcare: 'HEALTHCARE', lifestyle: 'LIFESTYLE' };
+  const FLEXIBILITY_MAP = { 'Non-Negotiable': 'NON_NEGOTIABLE', 'Negotiable': 'NEGOTIABLE' };
+
+  // Adapts a CustomerGoalResponse (API) into the local goal shape used by renderGoalsList()
+  function apiGoalToLocal(g) {
+    return {
+      id: g.id,
+      name: g.name,
+      priority: fromApiEnum(PRIORITY_MAP, g.priority),
+      horizon: g.timelineYears,
+      costToday: g.targetCorpus,
+      inflationCat: fromApiEnum(INFLATION_MAP, g.inflationCategory),
+      inflRate: (g.inflationRatePct || 0) / 100,
+      futureCost: g.futureCost,
+      flexibility: fromApiEnum(FLEXIBILITY_MAP, g.flexibility),
+      earmarked: g.earmarkedAssets,
+      earreturn: g.earmarkedReturnPct
+    };
+  }
+
+  function openBlankGoalsForm() {
+    goals = [];
+    renderGoalsList();
+  }
+
+  // ── Load Goal Map (GET /api/customers/{onboardingId}/goals) ──
+  async function loadGoalsFromApi(onboardingId) {
+    try {
+      const res = await fetch(`${API_BASE}/api/customers/${onboardingId}/goals`);
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.message || 'Failed to load goal map.');
+      }
+      const data = await res.json();
+      goals = data.map(apiGoalToLocal);
+      renderGoalsList();
+    } catch (err) {
+      NF.toast(err.message || 'Could not reach the server.', 'error');
+    }
+  }
+
   function setupGoalsForm() {
     const form = $('#form-goal');
     if (!form) return;
 
-    form.addEventListener('submit', (e) => {
+    form.addEventListener('submit', async (e) => {
       e.preventDefault();
-      const client = getActiveClient();
-      if (!client) return;
+      const onboardingId = NF.getActiveClientId();
+      if (!onboardingId) {
+        NF.toast('Search for a client by mobile number first.', 'error');
+        return;
+      }
 
-      const name = $('#gl-name').value;
-      const priority = $('#gl-priority').value;
-      const horizon = parseFloat($('#gl-horizon').value);
-      const costToday = parseFloat($('#gl-cost').value);
-      const inflationCat = $('#gl-inflation').value;
-      const flexibility = $('#gl-flexibility').value;
-      const earmarked = parseFloat($('#gl-earmarked').value || 0);
-      const earreturn = parseFloat($('#gl-earreturn').value || 0);
-
-      // Map inflation rate
-      const inflMap = { cpi: 0.06, education: 0.10, healthcare: 0.09, lifestyle: 0.075 };
-      const inflRate = inflMap[inflationCat];
-
-      // Future value compounding
-      const futureCost = costToday * Math.pow(1 + inflRate, horizon);
-
-      const goal = {
-        id: 'G' + String(goals.length + 1).padStart(2, '0') + '-' + Date.now().toString().slice(-4),
-        name,
-        priority,
-        horizon,
-        costToday,
-        inflationCat,
-        inflRate,
-        futureCost,
-        flexibility,
-        earmarked,
-        earreturn
+      const payload = {
+        name: $('#gl-name').value.trim(),
+        targetCorpus: parseFloat($('#gl-cost').value),
+        timelineYears: parseInt($('#gl-horizon').value, 10),
+        priority: toApiEnum(PRIORITY_MAP, $('#gl-priority').value),
+        inflationCategory: toApiEnum(INFLATION_MAP, $('#gl-inflation').value),
+        flexibility: toApiEnum(FLEXIBILITY_MAP, $('#gl-flexibility').value),
+        earmarkedAssets: parseFloat($('#gl-earmarked').value || '0'),
+        earmarkedReturnPct: parseFloat($('#gl-earreturn').value || '0')
       };
 
-      goals.push(goal);
-      NF.updateClient(client.id, { goals });
+      const btn = $('#btn-add-goal');
+      if (btn) btn.disabled = true;
 
-      NF.toast(`Goal "${name}" added.`, 'success');
-      form.reset();
-      $('#gl-earmarked').value = 0;
-      $('#gl-earreturn').value = 0;
-      renderGoalsList();
+      try {
+        const res = await fetch(`${API_BASE}/api/customers/${onboardingId}/goals`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+
+        if (!res.ok) {
+          const body = await res.json().catch(() => ({}));
+          throw new Error(body.message || 'Failed to add goal.');
+        }
+
+        const data = await res.json();
+        goals = data.map(apiGoalToLocal);
+        clientFlags.hasGoalMap = goals.length > 0;
+
+        NF.toast(`Goal "${payload.name}" added.`, 'success');
+        form.reset();
+        $('#gl-earmarked').value = 0;
+        $('#gl-earreturn').value = 0;
+        renderGoalsList();
+      } catch (err) {
+        NF.toast(err.message || 'Could not reach the server.', 'error');
+      } finally {
+        if (btn) btn.disabled = false;
+      }
     });
 
-    // Save goal map artifact
+    // "Save Goal Map" confirms the mapped goals and returns to Overview.
+    // Goals are already persisted individually via POST above.
     const saveBtn = $('#btn-save-goals');
     if (saveBtn) {
       saveBtn.addEventListener('click', () => {
-        const client = getActiveClient();
-        if (!client) return;
-
         if (goals.length === 0) {
           NF.toast('Please add at least one goal first!', 'error');
           return;
         }
-
-        const art04MD = generateArtifact04MD(client, goals);
-        NF.setArtifact(client.id, '04', art04MD, 'rm');
-        
-        NF.toast('Artifact 04 — Goal Map saved successfully!', 'success');
-        onClientChange();
+        NF.toast('Goal Map confirmed.', 'success');
         switchView('overview');
       });
     }
@@ -938,7 +1064,7 @@
     title.textContent = 'Current Mapped Client Goals';
     container.appendChild(title);
 
-    goals.forEach((g, idx) => {
+    goals.forEach((g) => {
       const el = document.createElement('div');
       el.className = 'goal-row';
 
@@ -960,54 +1086,35 @@
             <div class="goal-amt">${NF.fmt(g.futureCost)}</div>
             <div style="font-size: .65rem; color: var(--text-tertiary)">Future inflation-adjusted target</div>
           </div>
-          <button class="goal-del" data-idx="${idx}">
+          <button class="goal-del" data-goal-id="${g.id}">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
           </button>
         </div>
       `;
 
-      el.querySelector('.goal-del').addEventListener('click', (e) => {
-        const client = getActiveClient();
-        const deleteIdx = parseInt(e.currentTarget.dataset.idx);
-        goals.splice(deleteIdx, 1);
-        NF.updateClient(client.id, { goals });
-        NF.toast('Goal deleted.', 'info');
-        renderGoalsList();
+      el.querySelector('.goal-del').addEventListener('click', async (e) => {
+        const onboardingId = NF.getActiveClientId();
+        const goalId = e.currentTarget.dataset.goalId;
+        if (!onboardingId || !goalId) return;
+
+        try {
+          const res = await fetch(`${API_BASE}/api/customers/${onboardingId}/goals/${goalId}`, { method: 'DELETE' });
+          if (!res.ok) {
+            const body = await res.json().catch(() => ({}));
+            throw new Error(body.message || 'Failed to delete goal.');
+          }
+          const data = await res.json();
+          goals = data.map(apiGoalToLocal);
+          clientFlags.hasGoalMap = goals.length > 0;
+          NF.toast('Goal deleted.', 'info');
+          renderGoalsList();
+        } catch (err) {
+          NF.toast(err.message || 'Could not reach the server.', 'error');
+        }
       });
 
       container.appendChild(el);
     });
-  }
-
-  function generateArtifact04MD(client, gs) {
-    const ts = new Date().toISOString();
-    let md = `# Artifact 04 — Goal Map
-**Fiduciary Compounding Asset Target & Time Horizon Allocation Records**
-
-- **Client ID:** ${client.id}
-- **Compiled On:** ${NF.fmtDate(ts)}
-- **Fiduciary Adviser:** SEBI Registered Investment Adviser
-
-## Consolidated Goal Matrix
-| Goal Name | Priority Code | Horizon (Yrs) | Cost (Today) | Inflation Rate | compounded Future Target | Earmarked Assets |
-| :--- | :---: | :---: | :---: | :---: | :---: | :---: |\n`;
-
-    gs.forEach(g => {
-      md += `| ${g.name} | ${g.priority} | ${g.horizon} | ${NF.fmt(g.costToday)} | ${(g.inflRate * 100).toFixed(1)}% | **${NF.fmt(g.futureCost)}** | ${g.earmarked ? NF.fmt(g.earmarked) : '—'} |\n`;
-    });
-
-    md += `\n## Fiduciary Rationale & Compounding Dynamics
-1. **Fiduciary Risk Alignment:** Goals are strictly categorized by priority. Under RIA advisory protocols, **Critical** goals are mapped with zero-downside short-term portfolios if the horizon is less than 3 years.
-2. **Specific Inflation Sizing:** Unlike generic planning that applies standard 6% inflation, this model utilizes tailored compounding multipliers:
-   - **Education** compounded at **10.0%** annual compound rate.
-   - **Healthcare** compounded at **9.0%** annual compound rate.
-   - **Lifestyle & Discretionary** compounded at **7.5%** annual compound rate.
-   - **General Consumption** compounded at **6.0%** annual compound rate.
-3. **Fiduciary Safeguards:** All compounded targets are locking vectors for the Analyst portal to execute deterministic SIP/Lump-sum gap calculations. No subjective parameters are allowed downstream.
-
----
-*Fiduciary Sign-Off: Under SEBI RIA Regs, this goal map acts as the formal, client-acknowledged target matrix for wealth design validation.*`;
-    return md;
   }
 
   // ═══════════════════════════════════════════
@@ -1446,6 +1553,9 @@ ${act}
         NF.deleteClient(id);
         NF.toast(`Client ${id} deleted successfully.`, 'success');
         NF.setActiveClientId(''); // Reset active client
+        isOtpVerified = false;
+        searchedMobile = '';
+        clientFlags = { hasProfile: false, hasFinancials: false, hasRiskAssessment: false, hasGoalMap: false };
         onClientChange();
       }
     });
@@ -1461,7 +1571,7 @@ ${act}
   // ── Init ──
   function init() {
     setupNav();
-    setupClientSelector();
+    setupClientSearch();
     setupDeleteClientButton();
     setupProfileForm();
     setupRiskForm();

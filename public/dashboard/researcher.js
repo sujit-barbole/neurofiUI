@@ -6,32 +6,32 @@
 (function () {
   'use strict';
 
-  // ── Product Universe ──
-  const PRODUCTS = [
-    { cat: 'Equity — Large Cap Index',   fund: 'UTI Nifty 50 Index Direct Growth',        er: '0.18%', rationale: 'Low-cost passive core holding tracking the Nifty 50 index. Eliminates fund manager risk while providing broad large-cap exposure at the lowest possible expense ratio.' },
-    { cat: 'Equity — Flexi Cap',          fund: 'Parag Parikh Flexi Cap Direct Growth',     er: '0.63%', rationale: 'Diversified multi-cap fund with ~25% international equity allocation. Provides geographic diversification and access to global technology leaders unavailable in domestic markets.' },
-    { cat: 'Equity — Mid Cap',            fund: 'Motilal Oswal Midcap Direct Growth',       er: '0.58%', rationale: 'Concentrated high-conviction mid-cap portfolio targeting companies in the ₹5,000–₹20,000 Cr market cap range. Suitable for long-term wealth creation with higher growth potential.' },
-    { cat: 'Debt — Corporate Bond',       fund: 'HDFC Corporate Bond Direct Growth',        er: '0.35%', rationale: 'Invests predominantly in AAA/AA+ rated corporate bonds. Provides steady accrual income with low credit risk, suitable for medium-term debt allocation.' },
-    { cat: 'Debt — Liquid',               fund: 'Quantum Liquid Direct Growth',              er: '0.19%', rationale: 'Ultra-short maturity government securities-focused liquid fund. Ideal for emergency fund parking with instant redemption facility up to ₹50,000.' },
-    { cat: 'Debt — Short Duration',       fund: 'Kotak Low Duration Direct Growth',          er: '0.42%', rationale: 'Modified duration of 6-12 months targeting short-term goals under 3 years. Provides better returns than liquid funds while maintaining low interest rate sensitivity.' },
-    { cat: 'Gold — SGB',                  fund: 'Sovereign Gold Bond (RBI)',                  er: '0%',    rationale: 'Government-backed gold exposure with 2.5% annual interest and zero capital gains tax at maturity (8 years). Most tax-efficient gold investment vehicle available.' },
-    { cat: 'NPS — Retirement',            fund: 'NPS Tier I (Auto choice / LC75)',            er: '0.01%', rationale: 'Additional ₹50,000 deduction under Section 80CCD(1B) beyond 80C limit. Auto choice glide-path reduces equity gradually as retirement approaches. Lowest cost retirement vehicle.' }
-  ];
-
   // ── State ──
   let activeView = 'overview';
   let gate3Checks = [false, false, false, false];
+  let searchedMobile = '';
+  let goalsCache = null;
+  let allocationCache = null;
+  let productsCache = null;
+  let planCache = null;
+  let productRowSeq = 0;
+  let catalogCache = null;
+
+  const API_BASE = window.NF_API_BASE || 'http://localhost:8080';
 
   // ── DOM Helpers ──
   const $ = (sel) => document.querySelector(sel);
-  const $$ = (sel) => document.querySelectorAll(sel);
+  const $$ = (sel) => Array.from(document.querySelectorAll(sel));
 
   // ── Navigation ──
   function setupNav() {
     $$('.nav-btn[data-view]').forEach(btn => {
       btn.addEventListener('click', () => {
-        const view = btn.dataset.view;
-        switchView(view);
+        if (btn.classList.contains('locked')) {
+          NF.toast('Search for a client by mobile number first.', 'error');
+          return;
+        }
+        switchView(btn.dataset.view);
       });
     });
   }
@@ -49,216 +49,233 @@
     renderCurrentView();
   }
 
-  // ── Client Selector ──
-  function populateClientSelector() {
-    const sel = $('#sel-client');
-    const clients = NF.getClients();
-    const activeId = NF.getActiveClientId();
+  // ── Client Search (by mobile number) ──
+  function setupClientSearch() {
+    const btn = $('#btn-search-client');
+    const input = $('#search-client-phone');
+    if (!btn || !input) return;
 
-    sel.innerHTML = '<option value="">— Select client —</option>';
-    clients.forEach(c => {
-      const opt = document.createElement('option');
-      opt.value = c.id;
-      opt.textContent = `${c.id} — ${c.profile.fname} ${c.profile.lname}`;
-      if (c.id === activeId) opt.selected = true;
-      sel.appendChild(opt);
-    });
-
-    sel.addEventListener('change', () => {
-      NF.setActiveClientId(sel.value);
-      refreshAll();
+    const runSearch = () => searchClientByPhone(input.value.trim());
+    btn.addEventListener('click', runSearch);
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        runSearch();
+      }
     });
   }
 
-  // ── Access Check ──
-  function getActiveClient() {
-    const id = NF.getActiveClientId();
-    return id ? NF.getClient(id) : null;
+  function resetCaches() {
+    goalsCache = null;
+    allocationCache = null;
+    productsCache = null;
+    planCache = null;
   }
 
-  function checkAccess() {
-    const client = getActiveClient();
-    const noClient = $('#no-client-screen');
-    const guard = $('#guard-screen');
-    const views = $$('.view');
+  async function searchClientByPhone(mobile) {
+    if (!mobile) {
+      NF.toast('Enter a mobile number to search.', 'error');
+      return;
+    }
+
+    const btn = $('#btn-search-client');
+    if (btn) btn.disabled = true;
+    resetCaches();
+
+    try {
+      const res = await fetch(`${API_BASE}/api/onboarding/search?mobile=${encodeURIComponent(mobile)}`);
+
+      if (res.status === 404) {
+        searchedMobile = '';
+        NF.setActiveClientId('');
+        NF.toast('No client found for this mobile number.', 'error');
+        applyAccessState();
+        return;
+      }
+
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.message || 'Search failed.');
+      }
+
+      const data = await res.json();
+      searchedMobile = data.mobileNumber || mobile;
+      NF.setActiveClientId(String(data.onboardingId));
+
+      NF.toast('Client found. Researcher sections unlocked.', 'success');
+
+      applyAccessState();
+    } catch (err) {
+      searchedMobile = '';
+      NF.toast(err.message || 'Could not reach the server.', 'error');
+      applyAccessState();
+    } finally {
+      if (btn) btn.disabled = false;
+    }
+  }
+
+  // ── Access Gating ──
+  // Overview is always reachable (it's where the phone search lives). Every
+  // other tab locks until a client is found. (Gate 2 check disabled for now.)
+  function applyAccessState() {
+    const onboardingId = NF.getActiveClientId();
+    const ready = !!onboardingId;
     const chip = $('#client-chip');
+    const chipLabel = $('#chip-label');
 
-    if (!client) {
-      noClient.style.display = 'block';
-      guard.style.display = 'none';
-      views.forEach(v => v.style.display = 'none');
+    if (onboardingId && searchedMobile) {
+      chip.style.display = 'flex';
+      chipLabel.textContent = `${searchedMobile} (Onboarding #${onboardingId})`;
+    } else {
       chip.style.display = 'none';
-      return false;
     }
 
-    chip.style.display = 'flex';
-    $('#chip-label').textContent = `${client.profile.fname} ${client.profile.lname} (${client.id})`;
+    $$('.nav-btn[data-view]').forEach(btn => {
+      btn.classList.toggle('locked', btn.dataset.view !== 'overview' && !ready);
+    });
 
-    if (!NF.isGatePassed(client.id, 2)) {
-      noClient.style.display = 'none';
-      guard.style.display = 'block';
-      views.forEach(v => v.style.display = 'none');
-      return false;
+    // If the currently open tab just became locked (e.g. a fresh search reset
+    // state), bounce back to Overview rather than leaving a dead view showing.
+    if (activeView !== 'overview' && !ready) {
+      switchView('overview');
+      return;
     }
 
-    noClient.style.display = 'none';
-    guard.style.display = 'none';
-    return true;
-  }
-
-  // ── Refresh ──
-  function refreshAll() {
-    if (!checkAccess()) return;
-    // Re-show the active view
-    $$('.view').forEach(v => v.classList.toggle('active', v.id === `view-${activeView}`));
     renderCurrentView();
   }
 
   function renderCurrentView() {
-    const client = getActiveClient();
-    if (!client) return;
+    if (activeView === 'overview') {
+      renderOverview();
+      return;
+    }
+
+    const onboardingId = NF.getActiveClientId();
+    if (!onboardingId) return;
 
     switch (activeView) {
-      case 'overview':     renderOverview(client); break;
-      case 'input-review': renderInputReview(client); break;
-      case 'allocation':   renderAllocation(client); break;
-      case 'products':     renderProducts(client); break;
-      case 'fullplan':     renderFullPlan(client); break;
-      case 'gate3':        renderGate3(client); break;
+      case 'input-review': renderInputReview(onboardingId); break;
+      case 'allocation': renderAllocationView(onboardingId); break;
+      case 'products': renderProductsView(onboardingId); break;
+      case 'fullplan': renderFullPlanView(onboardingId); break;
+      case 'gate3': renderGate3(onboardingId); break;
+    }
+  }
+
+  // ── Shared goal cache (used by Allocation + Products forms) ──
+  async function ensureGoalsLoaded(onboardingId) {
+    if (goalsCache) return goalsCache;
+    try {
+      const res = await fetch(`${API_BASE}/api/customers/${onboardingId}/goals`);
+      goalsCache = res.ok ? await res.json() : [];
+    } catch {
+      goalsCache = [];
+    }
+    return goalsCache;
+  }
+
+  // Static, customer-agnostic curated product list — only fetched once per session.
+  async function ensureCatalogLoaded(onboardingId) {
+    if (catalogCache) return catalogCache;
+    try {
+      const res = await fetch(`${API_BASE}/api/customers/${onboardingId}/research/products/catalog`);
+      catalogCache = res.ok ? await res.json() : [];
+    } catch {
+      catalogCache = [];
+    }
+    return catalogCache;
+  }
+
+  function populateCatalogSelect(catalog) {
+    const sel = $('#pf-catalog-select');
+    if (!sel) return;
+    sel.innerHTML = catalog.length
+      ? catalog.map((c, idx) => `<option value="${idx}">${escapeHtml(c.productName)} — ${escapeHtml(c.category)} (${c.assetClass}, ${escapeHtml(c.expenseRatio)})</option>`).join('')
+      : '<option value="">No catalog products available</option>';
+  }
+
+  async function fetchTextOrMessage(url, notFoundMessage) {
+    try {
+      const res = await fetch(url);
+      if (res.status === 404) return notFoundMessage;
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.message || 'Request failed.');
+      }
+      return JSON.stringify(await res.json(), null, 2);
+    } catch (err) {
+      return err.message || 'Could not reach the server.';
     }
   }
 
   // ═══════════════════════════════════════════
   //  VIEW: OVERVIEW
   // ═══════════════════════════════════════════
-  function renderOverview(client) {
-    // Stats
-    const riskCat = client.riskCategory || '—';
-    const riskScore = client.riskScore || 0;
-    const goalCount = (client.goals || []).length;
-    const artCount = NF.getReadableArtifacts(client.id, 'researcher').length;
+  function renderOverview() {
+    const onboardingId = NF.getActiveClientId();
+    $('#overview-gates').innerHTML = '';
+
+    if (!onboardingId) {
+      $('#overview-stats').innerHTML = '';
+      $('#overview-inputs').innerHTML = `
+        <p style="color:var(--text-muted);font-size:.85rem;margin-top:12px">
+          Enter a client's mobile number above and click <strong>Get Client</strong> to begin.
+        </p>
+      `;
+      return;
+    }
 
     $('#overview-stats').innerHTML = `
       <div class="stat glass">
-        <div class="stat-icon" style="background:rgba(168,85,247,.15)">
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--accent-purple)" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-        </div>
-        <div><div class="stat-val">${riskScore}/100</div><div class="stat-lbl">Risk Score</div></div>
-      </div>
-      <div class="stat glass">
-        <div class="stat-icon" style="background:rgba(245,158,11,.15)">
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--accent-amber)" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
-        </div>
-        <div><div class="stat-val">${riskCat}</div><div class="stat-lbl">Risk Category</div></div>
-      </div>
-      <div class="stat glass">
-        <div class="stat-icon" style="background:rgba(16,185,129,.15)">
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--accent-green)" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
-        </div>
-        <div><div class="stat-val">${goalCount}</div><div class="stat-lbl">Client Goals</div></div>
-      </div>
-      <div class="stat glass">
-        <div class="stat-icon" style="background:rgba(99,102,241,.15)">
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--accent-blue)" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
-        </div>
-        <div><div class="stat-val">${artCount}</div><div class="stat-lbl">Artifacts Available</div></div>
+        <div class="stat-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 00-4-4H6a4 4 0 00-4-4v2"/><circle cx="9" cy="7" r="4"/></svg></div>
+        <div><div class="stat-val">#${onboardingId}</div><div class="stat-lbl">Onboarding ID</div></div>
       </div>
     `;
-
-    // Gate Status
-    const gates = NF.getGateStatus(client.id);
-    const gateTimestamps = client.gateTimestamps || {};
-    let gatesHTML = '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px;margin-bottom:22px">';
-    for (let i = 1; i <= 4; i++) {
-      const passed = gates[i];
-      const cls = passed ? 'passed' : (i <= 3 ? (i === 3 ? 'active' : 'passed') : 'locked');
-      const numCls = passed ? 'ok' : (i === 3 && gates[2] ? 'pending' : 'off');
-      const label = ['', 'RM Intake', 'Analyst Review', 'Strategic Review', 'Final Delivery'][i];
-      const ts = gateTimestamps[i] ? NF.fmtDate(gateTimestamps[i]) : 'Pending';
-      gatesHTML += `
-        <div class="gate-card ${cls}">
-          <div class="gate-hdr">
-            <div class="gate-num ${numCls}">${i}</div>
-            <div>
-              <div class="gate-title">Gate ${i}</div>
-              <div class="gate-sub">${label} — ${passed ? 'Passed' : ts === 'Pending' ? 'Pending' : ts}</div>
-            </div>
-          </div>
-        </div>`;
-    }
-    gatesHTML += '</div>';
-    $('#overview-gates').innerHTML = gatesHTML;
-
-    // Input Availability
-    const inputArts = [
-      { id: '02', name: 'Risk Profile', agent: 'RM' },
-      { id: '07', name: 'Goal Gap Analysis', agent: 'Analyst' },
-      { id: '08', name: 'Tax Optimization', agent: 'Analyst' },
-      { id: '09', name: 'Retirement Analysis', agent: 'Analyst' }
-    ];
-    let inputHTML = '<div class="card"><h3><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--accent-purple)" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg> Available Inputs</h3>';
-    inputHTML += '<table class="tbl"><thead><tr><th>Artifact</th><th>Name</th><th>Source</th><th>Status</th><th>Generated</th></tr></thead><tbody>';
-    inputArts.forEach(a => {
-      const art = NF.getArtifact(client.id, a.id, 'researcher');
-      const status = art ? '<span class="tag tag-green">Available</span>' : '<span class="tag tag-amber">Pending</span>';
-      const ts = art ? NF.fmtDate(art.generatedAt) : '—';
-      inputHTML += `<tr><td style="font-weight:700;color:var(--accent-purple)">${a.id}</td><td>${a.name}</td><td>${a.agent}</td><td>${status}</td><td style="font-size:.75rem">${ts}</td></tr>`;
-    });
-    inputHTML += '</tbody></table>';
-
-    // Output status
-    const outputArts = [
-      { id: '10', name: 'Asset Allocation' },
-      { id: '11', name: 'Product Recommendations' },
-      { id: '12', name: 'Comprehensive Plan' }
-    ];
-    inputHTML += '<div class="form-sec" style="margin-top:22px">Researcher Outputs</div>';
-    inputHTML += '<table class="tbl"><thead><tr><th>Artifact</th><th>Name</th><th>Status</th><th>Generated</th><th>Version</th></tr></thead><tbody>';
-    outputArts.forEach(a => {
-      const art = NF.getArtifact(client.id, a.id, 'researcher');
-      const status = art ? '<span class="tag tag-green">Generated</span>' : '<span class="tag tag-purple">Not Yet</span>';
-      const ts = art ? NF.fmtDate(art.generatedAt) : '—';
-      const ver = art ? `v${art.version}` : '—';
-      inputHTML += `<tr><td style="font-weight:700;color:var(--accent-purple)">${a.id}</td><td>${a.name}</td><td>${status}</td><td style="font-size:.75rem">${ts}</td><td>${ver}</td></tr>`;
-    });
-    inputHTML += '</tbody></table></div>';
-    $('#overview-inputs').innerHTML = inputHTML;
+    $('#overview-inputs').innerHTML = `
+      <p style="color:var(--text-muted);font-size:.85rem;margin-top:12px">
+        Use the sidebar to review Analyst inputs, set the strategic allocation, recommend products,
+        and compile the full plan for this client.
+      </p>
+    `;
   }
 
   // ═══════════════════════════════════════════
   //  VIEW: INPUT REVIEW
   // ═══════════════════════════════════════════
-  function renderInputReview(client) {
+  async function renderInputReview(onboardingId) {
     const panels = [
-      { id: '02', name: 'Risk Profile', icon: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--accent-purple)" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>' },
-      { id: '07', name: 'Goal Gap Analysis', icon: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--accent-amber)" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>' },
-      { id: '08', name: 'Tax Optimization', icon: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--accent-green)" stroke-width="2"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>' },
-      { id: '09', name: 'Retirement Analysis', icon: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--accent-blue)" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>' }
+      { id: '02', name: 'Risk Profile' },
+      { id: '07', name: 'Goal Gap Analysis' },
+      { id: '08', name: 'Tax Optimization' },
+      { id: '09', name: 'Retirement Analysis' }
     ];
 
     let html = '';
     panels.forEach((p, idx) => {
-      const art = NF.getArtifact(client.id, p.id, 'researcher');
-      const openClass = idx === 0 ? 'open' : ''; // first panel open by default
-      html += `<div class="artifact-panel ${openClass}" id="panel-art-${p.id}">`;
-      html += `<div class="artifact-panel-hdr" onclick="togglePanel('${p.id}')">
-        <h3>${p.icon} Artifact ${p.id} — ${p.name}
-          ${art ? '<span class="tag tag-green" style="margin-left:8px">Available</span>' : '<span class="tag tag-amber" style="margin-left:8px">Pending</span>'}
-        </h3>
-        <svg class="chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+      const openClass = idx === 0 ? 'open' : '';
+      html += `<div class="artifact-panel ${openClass}" id="panel-art-${p.id}">
+        <div class="artifact-panel-hdr" onclick="togglePanel('${p.id}')">
+          <h3>Artifact ${p.id} — ${p.name}</h3>
+          <svg class="chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+        </div>
+        <div class="artifact-viewer" id="panel-viewer-${p.id}">Loading…</div>
       </div>`;
-      if (art) {
-        html += `<div class="artifact-viewer">${escapeHtml(art.content)}</div>`;
-      } else {
-        html += `<div class="empty-msg">Artifact ${p.id} (${p.name}) has not been generated yet. This artifact will become available once the ${p.id === '02' ? 'RM' : 'Analyst'} completes their work.</div>`;
-      }
-      html += `</div>`;
     });
-
     $('#input-review-panels').innerHTML = html;
+
+    const [risk, goalGaps, tax, retirement] = await Promise.all([
+      fetchTextOrMessage(`${API_BASE}/api/customers/${onboardingId}/risk-assessment`, 'Risk assessment not yet completed.'),
+      fetchTextOrMessage(`${API_BASE}/api/customers/${onboardingId}/analyst/reports/GOAL_GAPS/latest`, 'Goal Gap report not yet generated.'),
+      fetchTextOrMessage(`${API_BASE}/api/customers/${onboardingId}/analyst/reports/TAX/latest`, 'Tax report not yet generated.'),
+      fetchTextOrMessage(`${API_BASE}/api/customers/${onboardingId}/analyst/reports/RETIREMENT_PLANNING/latest`, 'Retirement report not yet generated.')
+    ]);
+
+    const v02 = $('#panel-viewer-02'); if (v02) v02.textContent = risk;
+    const v07 = $('#panel-viewer-07'); if (v07) v07.textContent = goalGaps;
+    const v08 = $('#panel-viewer-08'); if (v08) v08.textContent = tax;
+    const v09 = $('#panel-viewer-09'); if (v09) v09.textContent = retirement;
   }
 
-  // Global toggle for panels
   window.togglePanel = function (artId) {
     const panel = $(`#panel-art-${artId}`);
     if (panel) panel.classList.toggle('open');
@@ -267,41 +284,44 @@
   // ═══════════════════════════════════════════
   //  VIEW: ALLOCATION (10)
   // ═══════════════════════════════════════════
-  function renderAllocation(client) {
-    const score = client.riskScore || 0;
-    const catData = NF.scoreToCategory(score);
+  async function renderAllocationView(onboardingId) {
+    try {
+      const res = await fetch(`${API_BASE}/api/customers/${onboardingId}/research/allocation`);
 
-    // Risk summary
+      if (res.status === 404) {
+        allocationCache = null;
+        await openAllocationForm(onboardingId, null);
+        return;
+      }
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.message || 'Failed to load allocation.');
+      }
+
+      allocationCache = await res.json();
+      renderAllocationViewMode(allocationCache);
+    } catch (err) {
+      NF.toast(err.message || 'Could not reach the server.', 'error');
+    }
+  }
+
+  function renderAllocationViewMode(data) {
+    const sa = data.strategicAllocation || {};
+    const eq = sa.equityPct || 0, debt = sa.debtPct || 0, gold = sa.goldPct || 0;
+    const eqDeg = (eq / 100) * 360, debtDeg = (debt / 100) * 360, goldDeg = (gold / 100) * 360;
+
     $('#alloc-risk-summary').innerHTML = `
-      <div class="score-header glass">
-        <div class="score-ring">
-          <svg viewBox="0 0 120 120">
-            <circle class="score-track" cx="60" cy="60" r="52"/>
-            <circle class="score-fill" cx="60" cy="60" r="52"
-              style="stroke:${catData.color};stroke-dashoffset:${326.7 - (326.7 * score / 100)}"/>
-          </svg>
-          <div class="score-inner">
-            <span class="score-num" style="color:${catData.color}">${score}</span>
-            <span class="score-den">/ 100</span>
-          </div>
+      <div class="card glass" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px">
+        <div>
+          <div style="font-size:.78rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em">Status</div>
+          <div style="font-weight:700;color:${data.status === 'CONFIRMED' ? 'var(--accent-green)' : 'var(--accent-amber)'}">${data.status}</div>
         </div>
-        <div class="score-info">
-          <div class="cat-label" style="color:${catData.color}">${catData.cat}</div>
-          <div class="alloc-preview">
-            Equity ${catData.eq}% · Debt ${catData.debt}% · Gold ${catData.gold}%<br/>
-            Based on ${NF.RISK_QUESTIONS.length}-question risk assessment
-          </div>
+        <div style="text-align:right">
+          <div style="font-size:.78rem;color:var(--text-muted)">Total Monthly SIP / Corpus Allocated</div>
+          <div style="font-weight:700">${NF.fmt(data.totalMonthlySipInr || 0)} / ${NF.fmt(data.totalCorpusAllocatedInr || 0)}</div>
         </div>
       </div>
     `;
-
-    // Donut
-    const eqPct = catData.eq;
-    const debtPct = catData.debt;
-    const goldPct = catData.gold;
-    const eqDeg = (eqPct / 100) * 360;
-    const debtDeg = (debtPct / 100) * 360;
-    const goldDeg = (goldPct / 100) * 360;
 
     $('#alloc-donut-area').innerHTML = `
       <div class="alloc-wrap">
@@ -309,141 +329,607 @@
           <div class="donut-hole"></div>
         </div>
         <div>
-          <div class="legend-item"><div class="legend-dot" style="background:#6366f1"></div> Equity <span class="legend-pct">${eqPct}%</span></div>
-          <div class="legend-item"><div class="legend-dot" style="background:#10b981"></div> Debt <span class="legend-pct">${debtPct}%</span></div>
-          <div class="legend-item"><div class="legend-dot" style="background:#f59e0b"></div> Gold <span class="legend-pct">${goldPct}%</span></div>
+          <div class="legend-item"><div class="legend-dot" style="background:#6366f1"></div> Equity <span class="legend-pct">${eq}%</span></div>
+          <div class="legend-item"><div class="legend-dot" style="background:#10b981"></div> Debt <span class="legend-pct">${debt}%</span></div>
+          <div class="legend-item"><div class="legend-dot" style="background:#f59e0b"></div> Gold <span class="legend-pct">${gold}%</span></div>
+          ${sa.overrideReason ? `<div style="margin-top:10px;font-size:.78rem;color:var(--text-muted)"><strong>Override:</strong> ${escapeHtml(sa.overrideReason)}</div>` : ''}
         </div>
       </div>
     `;
 
-    // Goal-Horizon Bucketing
-    const goals = getClientGoals(client);
-    let tblHTML = '';
+    const goals = data.goalAllocations || [];
+    let tbl;
     if (goals.length === 0) {
-      tblHTML = '<p style="color:var(--text-muted);font-size:.82rem;font-style:italic">No goals available. Goals will be populated from RM/Analyst artifacts.</p>';
+      tbl = '<p style="color:var(--text-muted);font-size:.82rem;font-style:italic">No per-goal allocations recorded.</p>';
     } else {
-      tblHTML = '<table class="tbl"><thead><tr><th>Goal</th><th>Target</th><th>Horizon</th><th>Bucket</th><th>Equity</th><th>Debt</th><th>Gold</th></tr></thead><tbody>';
+      tbl = '<table class="tbl"><thead><tr><th>Goal</th><th>Horizon</th><th>Bucket</th><th>Equity</th><th>Debt</th><th>Gold</th><th>Monthly SIP</th><th>Corpus</th></tr></thead><tbody>';
       goals.forEach(g => {
-        const horizon = g.horizon || g.timeframe || 0;
-        let bucket, eq, debt, gold;
-        if (horizon < 3) {
-          bucket = 'Short-term (< 3y)';
-          eq = 0; debt = 100; gold = 0;
-        } else if (horizon <= 7) {
-          bucket = 'Medium-term (3-7y)';
-          eq = 40; debt = 50; gold = 10;
-        } else {
-          bucket = 'Long-term (> 7y)';
-          eq = catData.eq; debt = catData.debt; gold = catData.gold;
-        }
-        const amt = g.targetAmount || g.futureValue || g.amount || 0;
-        tblHTML += `<tr>
-          <td style="font-weight:600">${g.name || g.goal || '—'}</td>
-          <td style="color:var(--accent-green);font-weight:700">${NF.fmt(amt)}</td>
-          <td>${horizon} yrs</td>
-          <td><span class="tag ${horizon < 3 ? 'tag-amber' : horizon <= 7 ? 'tag-blue' : 'tag-purple'}">${bucket}</span></td>
-          <td>${eq}%</td>
-          <td>${debt}%</td>
-          <td>${gold}%</td>
+        const bucketTag = g.bucket === 'SHORT' ? 'tag-amber' : g.bucket === 'MEDIUM' ? 'tag-blue' : 'tag-purple';
+        tbl += `<tr>
+          <td style="font-weight:600">${escapeHtml(g.goalName || '—')}</td>
+          <td>${g.timelineYears} yrs</td>
+          <td><span class="tag ${bucketTag}">${g.bucket}</span></td>
+          <td>${g.equityPct}%</td>
+          <td>${g.debtPct}%</td>
+          <td>${g.goldPct}%</td>
+          <td style="color:var(--accent-green);font-weight:700">${NF.fmt(g.monthlySipAssignedInr)}</td>
+          <td>${NF.fmt(g.corpusAllocatedInr)}</td>
         </tr>`;
       });
-      tblHTML += '</tbody></table>';
+      tbl += '</tbody></table>';
     }
-    $('#alloc-horizon-table').innerHTML = tblHTML;
+    $('#alloc-horizon-table').innerHTML = tbl;
+
+    const sd = data.surplusDeployment || {};
+    $('#alloc-surplus-area').innerHTML = `
+      <div class="metrics">
+        <div class="m-item"><div class="m-lbl">Emergency Fund</div><div class="m-val">${NF.fmt(sd.emergencyFundMonthlyInr || 0)}</div></div>
+        <div class="m-item"><div class="m-lbl">NPS</div><div class="m-val">${NF.fmt(sd.npsMonthlyInr || 0)}</div></div>
+        <div class="m-item"><div class="m-lbl">Wealth Creation</div><div class="m-val">${NF.fmt(sd.wealthCreationMonthlyInr || 0)}</div></div>
+        <div class="m-item"><div class="m-lbl">Total Deployed</div><div class="m-val pos">${NF.fmt(sd.totalDeployedMonthlyInr || 0)}</div></div>
+      </div>
+    `;
+
+    $('#alloc-notes-view').innerHTML = data.notes
+      ? `<div class="card"><h3>Notes</h3><p style="color:var(--text-secondary)">${escapeHtml(data.notes)}</p></div>`
+      : '';
+
+    $('#alloc-view-mode').style.display = 'block';
+    $('#alloc-form').style.display = 'none';
   }
 
-  function getClientGoals(client) {
-    // Try multiple sources
-    if (client.goals && client.goals.length) return client.goals;
-    if (client.analysis && client.analysis.goalAnalysis && client.analysis.goalAnalysis.length) return client.analysis.goalAnalysis;
-    // Try to parse from artifact 07
-    const art07 = NF.getArtifact(client.id, '07', 'researcher');
-    if (art07 && art07.content) {
-      // Try to extract goals from markdown — basic pattern
-      const goals = [];
-      const lines = art07.content.split('\n');
-      let inTable = false;
-      lines.forEach(line => {
-        if (line.includes('|') && !line.includes('---')) {
-          const cells = line.split('|').map(c => c.trim()).filter(Boolean);
-          if (cells.length >= 3 && cells[0] !== 'Goal' && cells[0] !== 'Field') {
-            const name = cells[0];
-            const amt = parseFloat((cells[1] || '0').replace(/[₹,]/g, '')) || 0;
-            const horizon = parseFloat(cells[2]) || 0;
-            if (name && (amt || horizon)) {
-              goals.push({ name, targetAmount: amt, horizon });
-            }
-          }
-        }
-      });
-      if (goals.length) return goals;
+  async function openAllocationForm(onboardingId, prefill) {
+    const goals = await ensureGoalsLoaded(onboardingId);
+
+    $('#af-equity').value = prefill ? prefill.strategicAllocation.equityPct : '';
+    $('#af-debt').value = prefill ? prefill.strategicAllocation.debtPct : '';
+    $('#af-gold').value = prefill ? prefill.strategicAllocation.goldPct : '';
+    $('#af-override-reason').value = prefill ? (prefill.strategicAllocation.overrideReason || '') : '';
+    $('#af-emergency').value = prefill ? prefill.surplusDeployment.emergencyFundMonthlyInr : 0;
+    $('#af-nps').value = prefill ? prefill.surplusDeployment.npsMonthlyInr : 0;
+    $('#af-wealth').value = prefill ? prefill.surplusDeployment.wealthCreationMonthlyInr : 0;
+    $('#af-notes').value = prefill ? (prefill.notes || '') : '';
+
+    const rowsContainer = $('#af-goal-rows');
+    if (!goals.length) {
+      rowsContainer.innerHTML = '<p style="color:var(--text-muted);font-size:.82rem;font-style:italic">No goals found for this client yet.</p>';
+    } else {
+      const existingByGoal = {};
+      (prefill ? prefill.goalAllocations : []).forEach(g => { existingByGoal[g.goalId] = g; });
+      rowsContainer.innerHTML = goals.map(g => {
+        const ex = existingByGoal[g.id];
+        return `
+          <div class="frow" data-goal-id="${g.id}">
+            <div class="fgroup"><label>${escapeHtml(g.name)} — Monthly SIP (₹)</label><input type="number" min="0" class="af-goal-sip" value="${ex ? ex.monthlySipAssignedInr : 0}"/></div>
+            <div class="fgroup"><label>Corpus Allocated (₹)</label><input type="number" min="0" class="af-goal-corpus" value="${ex ? ex.corpusAllocatedInr : 0}"/></div>
+          </div>
+        `;
+      }).join('');
     }
-    return [];
+
+    $('#alloc-view-mode').style.display = 'none';
+    $('#alloc-form').style.display = 'block';
+    $('#btn-cancel-allocation').style.display = prefill ? 'inline-flex' : 'none';
+  }
+
+  function setupAllocationForm() {
+    const form = $('#alloc-form');
+    if (!form) return;
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const onboardingId = NF.getActiveClientId();
+      if (!onboardingId) return;
+
+      const equityPct = parseInt($('#af-equity').value, 10);
+      const debtPct = parseInt($('#af-debt').value, 10);
+      const goldPct = parseInt($('#af-gold').value, 10);
+      if (equityPct + debtPct + goldPct !== 100) {
+        NF.toast('Equity + Debt + Gold must total 100%.', 'error');
+        return;
+      }
+
+      const goalAllocations = $$('#af-goal-rows [data-goal-id]').map(row => ({
+        goalId: parseInt(row.dataset.goalId, 10),
+        monthlySipAssignedInr: parseFloat(row.querySelector('.af-goal-sip').value || '0'),
+        corpusAllocatedInr: parseFloat(row.querySelector('.af-goal-corpus').value || '0')
+      }));
+
+      const payload = {
+        strategicAllocation: { equityPct, debtPct, goldPct, overrideReason: $('#af-override-reason').value.trim() || null },
+        goalAllocations,
+        surplusDeployment: {
+          emergencyFundMonthlyInr: parseFloat($('#af-emergency').value || '0'),
+          npsMonthlyInr: parseFloat($('#af-nps').value || '0'),
+          wealthCreationMonthlyInr: parseFloat($('#af-wealth').value || '0')
+        },
+        notes: $('#af-notes').value.trim() || null
+      };
+
+      const btn = $('#btn-save-allocation');
+      if (btn) btn.disabled = true;
+      try {
+        const res = await fetch(`${API_BASE}/api/customers/${onboardingId}/research/allocation`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        if (!res.ok) {
+          const body = await res.json().catch(() => ({}));
+          throw new Error(body.message || 'Failed to save allocation.');
+        }
+        allocationCache = await res.json();
+        NF.toast('Allocation saved successfully!', 'success');
+        renderAllocationViewMode(allocationCache);
+      } catch (err) {
+        NF.toast(err.message || 'Could not reach the server.', 'error');
+      } finally {
+        if (btn) btn.disabled = false;
+      }
+    });
+
+    const cancelBtn = $('#btn-cancel-allocation');
+    if (cancelBtn) cancelBtn.addEventListener('click', () => {
+      if (allocationCache) renderAllocationViewMode(allocationCache);
+    });
+
+    const editBtn = $('#btn-edit-allocation');
+    if (editBtn) editBtn.addEventListener('click', () => {
+      const onboardingId = NF.getActiveClientId();
+      if (onboardingId) openAllocationForm(onboardingId, allocationCache);
+    });
   }
 
   // ═══════════════════════════════════════════
   //  VIEW: PRODUCTS (11)
   // ═══════════════════════════════════════════
-  function renderProducts(client) {
-    let html = '';
-    PRODUCTS.forEach((p, i) => {
-      html += `
-        <div class="product-row" id="product-${i}">
-          <div class="prod-hdr">
-            <span class="prod-name">${p.fund}</span>
-            <span class="prod-er">ER: ${p.er}</span>
+  async function renderProductsView(onboardingId) {
+    try {
+      const res = await fetch(`${API_BASE}/api/customers/${onboardingId}/research/products`);
+
+      if (res.status === 404) {
+        productsCache = null;
+        await openProductsForm(onboardingId, null);
+        return;
+      }
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.message || 'Failed to load products.');
+      }
+
+      productsCache = await res.json();
+      renderProductsViewMode(productsCache);
+    } catch (err) {
+      NF.toast(err.message || 'Could not reach the server.', 'error');
+    }
+  }
+
+  function renderProductsViewMode(data) {
+    const s = data.summary || {};
+    $('#products-summary-card').innerHTML = `
+      <div class="card glass">
+        <div class="metrics">
+          <div class="m-item"><div class="m-lbl">Tax Regime</div><div class="m-val">${data.taxRegime}</div></div>
+          <div class="m-item"><div class="m-lbl">Status</div><div class="m-val" style="color:${data.status === 'CONFIRMED' ? 'var(--accent-green)' : 'var(--accent-amber)'}">${data.status}</div></div>
+          <div class="m-item"><div class="m-lbl">Total Monthly SIP</div><div class="m-val pos">${NF.fmt(s.totalMonthlySipInr || 0)}</div></div>
+          <div class="m-item"><div class="m-lbl">Total Lump Sum</div><div class="m-val pos">${NF.fmt(s.totalLumpSumInr || 0)}</div></div>
+        </div>
+        ${data.notes ? `<p style="margin-top:14px;color:var(--text-secondary)">${escapeHtml(data.notes)}</p>` : ''}
+      </div>
+    `;
+
+    const rows = data.products || [];
+    $('#products-list').innerHTML = rows.length ? rows.map((p, idx) => {
+      const tagClass = p.assetClass === 'EQUITY' ? 'tag-blue' : p.assetClass === 'DEBT' ? 'tag-green' : p.assetClass === 'GOLD' ? 'tag-amber' : 'tag-purple';
+      return `
+      <div class="product-row">
+        <div class="prod-hdr">
+          <span class="prod-name">${escapeHtml(p.productName)}</span>
+          <div style="display:flex;align-items:center;gap:10px">
+            <span class="prod-er">ER: ${escapeHtml(p.expenseRatio)}</span>
+            <button type="button" class="goal-del" data-delete-product="${idx}" title="Remove product">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+            </button>
           </div>
-          <div class="prod-cat">${p.cat}</div>
-          <div class="fgroup full">
-            <label>Suitability Rationale (editable)</label>
-            <textarea id="rationale-${i}" rows="3">${p.rationale}</textarea>
-          </div>
-        </div>`;
+        </div>
+        <div class="prod-cat">${escapeHtml(p.category)} · <span class="tag ${tagClass}">${p.assetClass}</span> · ${p.allocationPctOfPortfolio}% of portfolio</div>
+        <div style="font-size:.85rem;color:var(--text-secondary);margin-bottom:8px">
+          <strong>Monthly SIP:</strong> ${NF.fmt(p.monthlySipInr)} &nbsp; <strong>Lump Sum:</strong> ${NF.fmt(p.lumpSumInr)} &nbsp; <strong>Goals:</strong> ${(p.goalIds || []).join(', ') || '—'}
+        </div>
+        <div style="font-size:.82rem;color:var(--text-tertiary);line-height:1.5"><strong>Suitability:</strong> ${escapeHtml(p.suitabilityRationale)}</div>
+      </div>`;
+    }).join('') : '<p style="color:var(--text-muted);font-size:.82rem;font-style:italic">No products recorded.</p>';
+
+    $$('#products-list [data-delete-product]').forEach(btn => {
+      btn.addEventListener('click', () => deleteProduct(parseInt(btn.dataset.deleteProduct, 10)));
     });
-    $('#products-list').innerHTML = html;
+
+    $('#products-view-mode').style.display = 'block';
+    $('#products-form').style.display = 'none';
+  }
+
+  // No single-product DELETE endpoint exists — removal re-saves the full list
+  // (minus the removed product) via the same upsert POST /research/products.
+  async function deleteProduct(index) {
+    const onboardingId = NF.getActiveClientId();
+    if (!onboardingId || !productsCache) return;
+
+    const remaining = (productsCache.products || []).filter((_, i) => i !== index);
+    if (remaining.length === 0) {
+      NF.toast('At least one product is required — edit the list instead of removing the last one.', 'error');
+      return;
+    }
+
+    const totalPct = remaining.reduce((sum, p) => sum + p.allocationPctOfPortfolio, 0);
+    if (totalPct !== 100) {
+      NF.toast(`Removing this product leaves allocation at ${totalPct}% — edit the remaining products' percentages before removing.`, 'error');
+      return;
+    }
+
+    const payload = {
+      taxRegime: productsCache.taxRegime,
+      products: remaining.map(p => ({
+        productName: p.productName,
+        category: p.category,
+        assetClass: p.assetClass,
+        expenseRatio: p.expenseRatio,
+        allocationPctOfPortfolio: p.allocationPctOfPortfolio,
+        monthlySipInr: p.monthlySipInr,
+        lumpSumInr: p.lumpSumInr,
+        suitabilityRationale: p.suitabilityRationale,
+        goalIds: p.goalIds || []
+      })),
+      notes: productsCache.notes || null
+    };
+
+    try {
+      const res = await fetch(`${API_BASE}/api/customers/${onboardingId}/research/products`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.message || 'Failed to remove product.');
+      }
+      productsCache = await res.json();
+      NF.toast('Product removed.', 'success');
+      renderProductsViewMode(productsCache);
+    } catch (err) {
+      NF.toast(err.message || 'Could not reach the server.', 'error');
+    }
+  }
+
+  function buildProductRowHTML(rowId, goals, data) {
+    data = data || {};
+    const goalIds = data.goalIds || [];
+    const goalOptions = goals.map(g => `<option value="${g.id}" ${goalIds.includes(g.id) ? 'selected' : ''}>${escapeHtml(g.name)}</option>`).join('');
+    return `
+      <div class="product-row" data-row-id="${rowId}">
+        <div class="prod-hdr">
+          <span class="prod-name">Product</span>
+          <button type="button" class="goal-del" data-remove-row="${rowId}">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+          </button>
+        </div>
+        <div class="frow">
+          <div class="fgroup"><label>Product Name *</label><input type="text" class="pr-name" value="${escapeHtml(data.productName || '')}" required/></div>
+          <div class="fgroup"><label>Category *</label><input type="text" class="pr-category" value="${escapeHtml(data.category || '')}" required placeholder="e.g. Flexi Cap"/></div>
+        </div>
+        <div class="frow">
+          <div class="fgroup"><label>Asset Class *</label>
+            <select class="pr-assetclass">
+              <option value="EQUITY" ${data.assetClass === 'EQUITY' ? 'selected' : ''}>Equity</option>
+              <option value="DEBT" ${data.assetClass === 'DEBT' ? 'selected' : ''}>Debt</option>
+              <option value="GOLD" ${data.assetClass === 'GOLD' ? 'selected' : ''}>Gold</option>
+              <option value="NPS" ${data.assetClass === 'NPS' ? 'selected' : ''}>NPS</option>
+            </select>
+          </div>
+          <div class="fgroup"><label>Expense Ratio *</label><input type="text" class="pr-er" value="${escapeHtml(data.expenseRatio || '')}" placeholder="0.35%" required/></div>
+        </div>
+        <div class="frow">
+          <div class="fgroup"><label>Allocation % of Portfolio *</label><input type="number" class="pr-pct" min="0" max="100" value="${data.allocationPctOfPortfolio ?? ''}" required/></div>
+          <div class="fgroup"><label>Monthly SIP (₹) *</label><input type="number" class="pr-sip" min="0" value="${data.monthlySipInr ?? 0}" required/></div>
+        </div>
+        <div class="frow">
+          <div class="fgroup"><label>Lump Sum (₹)</label><input type="number" class="pr-lumpsum" min="0" value="${data.lumpSumInr ?? 0}"/></div>
+          <div class="fgroup"><label>Goals Served</label><select class="pr-goals" multiple size="3">${goalOptions}</select></div>
+        </div>
+        <div class="fgroup full"><label>Suitability Rationale (SEBI Reg 17) *</label><textarea class="pr-rationale" rows="3" required>${escapeHtml(data.suitabilityRationale || '')}</textarea></div>
+      </div>
+    `;
+  }
+
+  function bindProductRowRemovers() {
+    $$('#pf-product-rows [data-remove-row]').forEach(btn => {
+      btn.onclick = () => btn.closest('.product-row').remove();
+    });
+  }
+
+  async function openProductsForm(onboardingId, prefill) {
+    const goals = await ensureGoalsLoaded(onboardingId);
+    $('#pf-tax-regime').value = prefill ? prefill.taxRegime : 'NEW';
+    $('#pf-notes').value = (prefill && prefill.notes) ? prefill.notes : '';
+
+    const catalog = await ensureCatalogLoaded(onboardingId);
+    populateCatalogSelect(catalog);
+
+    const container = $('#pf-product-rows');
+    container.innerHTML = '';
+    // No existing recommendation yet: start empty and let the researcher pick
+    // from the curated catalog (or add a blank row for manual entry).
+    const rows = (prefill && prefill.products) ? prefill.products : [];
+    rows.forEach(p => {
+      productRowSeq += 1;
+      container.insertAdjacentHTML('beforeend', buildProductRowHTML(productRowSeq, goals, p));
+    });
+    bindProductRowRemovers();
+
+    $('#products-view-mode').style.display = 'none';
+    $('#products-form').style.display = 'block';
+    $('#btn-cancel-products').style.display = prefill ? 'inline-flex' : 'none';
+  }
+
+  function setupProductsForm() {
+    const addBtn = $('#btn-add-product');
+    if (addBtn) addBtn.addEventListener('click', async () => {
+      const onboardingId = NF.getActiveClientId();
+      if (!onboardingId) return;
+      const goals = await ensureGoalsLoaded(onboardingId);
+      productRowSeq += 1;
+      $('#pf-product-rows').insertAdjacentHTML('beforeend', buildProductRowHTML(productRowSeq, goals, {}));
+      bindProductRowRemovers();
+    });
+
+    const addFromCatalogBtn = $('#btn-add-from-catalog');
+    if (addFromCatalogBtn) addFromCatalogBtn.addEventListener('click', async () => {
+      const onboardingId = NF.getActiveClientId();
+      if (!onboardingId) return;
+
+      const sel = $('#pf-catalog-select');
+      const idx = sel ? sel.value : '';
+      if (idx === '') {
+        NF.toast('Select a product from the catalog first.', 'error');
+        return;
+      }
+
+      const catalog = await ensureCatalogLoaded(onboardingId);
+      const item = catalog[parseInt(idx, 10)];
+      if (!item) return;
+
+      const goals = await ensureGoalsLoaded(onboardingId);
+      productRowSeq += 1;
+      $('#pf-product-rows').insertAdjacentHTML('beforeend', buildProductRowHTML(productRowSeq, goals, {
+        productName: item.productName,
+        category: item.category,
+        assetClass: item.assetClass,
+        expenseRatio: item.expenseRatio,
+        suitabilityRationale: item.defaultSuitabilityRationale,
+        allocationPctOfPortfolio: '',
+        monthlySipInr: 0,
+        lumpSumInr: 0,
+        goalIds: []
+      }));
+      bindProductRowRemovers();
+      NF.toast(`${item.productName} added — enter the allocation amount.`, 'success');
+    });
+
+    const form = $('#products-form');
+    if (form) {
+      form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const onboardingId = NF.getActiveClientId();
+        if (!onboardingId) return;
+
+        const rows = $$('#pf-product-rows .product-row');
+        if (rows.length === 0) {
+          NF.toast('Add at least one product before saving.', 'error');
+          return;
+        }
+        const products = rows.map(row => ({
+          productName: row.querySelector('.pr-name').value.trim(),
+          category: row.querySelector('.pr-category').value.trim(),
+          assetClass: row.querySelector('.pr-assetclass').value,
+          expenseRatio: row.querySelector('.pr-er').value.trim(),
+          allocationPctOfPortfolio: parseInt(row.querySelector('.pr-pct').value || '0', 10),
+          monthlySipInr: parseFloat(row.querySelector('.pr-sip').value || '0'),
+          lumpSumInr: parseFloat(row.querySelector('.pr-lumpsum').value || '0'),
+          suitabilityRationale: row.querySelector('.pr-rationale').value.trim(),
+          goalIds: Array.from(row.querySelector('.pr-goals').selectedOptions).map(o => parseInt(o.value, 10))
+        }));
+
+        const totalPct = products.reduce((sum, p) => sum + p.allocationPctOfPortfolio, 0);
+        if (totalPct !== 100) {
+          NF.toast(`Allocation percentages must total 100% (currently ${totalPct}%).`, 'error');
+          return;
+        }
+        if (products.some(p => !p.suitabilityRationale)) {
+          NF.toast('Suitability rationale is required for every product.', 'error');
+          return;
+        }
+
+        const payload = {
+          taxRegime: $('#pf-tax-regime').value,
+          products,
+          notes: $('#pf-notes').value.trim() || null
+        };
+
+        const btn = $('#btn-save-products');
+        if (btn) btn.disabled = true;
+        try {
+          const res = await fetch(`${API_BASE}/api/customers/${onboardingId}/research/products`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+          });
+          if (!res.ok) {
+            const body = await res.json().catch(() => ({}));
+            throw new Error(body.message || 'Failed to save products.');
+          }
+          productsCache = await res.json();
+          NF.toast('Products saved successfully!', 'success');
+          renderProductsViewMode(productsCache);
+        } catch (err) {
+          NF.toast(err.message || 'Could not reach the server.', 'error');
+        } finally {
+          if (btn) btn.disabled = false;
+        }
+      });
+    }
+
+    const cancelBtn = $('#btn-cancel-products');
+    if (cancelBtn) cancelBtn.addEventListener('click', () => {
+      if (productsCache) renderProductsViewMode(productsCache);
+    });
+
+    const editBtn = $('#btn-edit-products');
+    if (editBtn) editBtn.addEventListener('click', () => {
+      const onboardingId = NF.getActiveClientId();
+      if (onboardingId) openProductsForm(onboardingId, productsCache);
+    });
   }
 
   // ═══════════════════════════════════════════
   //  VIEW: FULL PLAN (12)
   // ═══════════════════════════════════════════
-  function renderFullPlan(client) {
-    const readableIds = ['02', '07', '08', '09', '10', '11'];
-    let html = '';
-    readableIds.forEach(id => {
-      const art = NF.getArtifact(client.id, id, 'researcher');
-      const name = NF.ARTIFACT_NAMES[id];
-      const ok = !!art;
-      html += `<div class="plan-check ${ok ? 'ok' : 'missing'}">
-        ${ok ? '✓' : '✗'} Artifact ${id} — ${name} ${ok ? `(v${art.version}, ${NF.fmtDate(art.generatedAt)})` : '— NOT YET GENERATED'}
-      </div>`;
-    });
+  async function renderFullPlanView(onboardingId) {
+    try {
+      const res = await fetch(`${API_BASE}/api/customers/${onboardingId}/research/plan`);
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.message || 'Failed to load plan.');
+      }
+      planCache = await res.json();
+      renderPlanAvailability(planCache.prerequisites);
 
-    // Check Artifact 12 compilation status
-    const art12 = NF.getArtifact(client.id, '12', 'researcher');
-    if (art12) {
-      html += `<div class="plan-check ok" style="margin-top:14px;border-top:1px solid var(--border-subtle);padding-top:10px">
-        ✓ Artifact 12 — Compiled Plan (v${art12.version}, ${NF.fmtDate(art12.generatedAt)})
-      </div>`;
-      html += `<div class="form-sec" style="margin-top:20px">Preview Compiled Dossier</div>`;
-      html += `<div class="artifact-viewer">${escapeHtml(art12.content)}</div>`;
+      const genBtn = $('#btn-gen-12');
       const expBtn = $('#btn-export-pdf');
-      if (expBtn) expBtn.style.display = 'inline-flex';
-    } else {
-      html += `<div class="plan-check missing" style="margin-top:14px;border-top:1px solid var(--border-subtle);padding-top:10px">
-        ✗ Artifact 12 — Compiled Plan — NOT YET COMPILED
-      </div>`;
-      const expBtn = $('#btn-export-pdf');
-      if (expBtn) expBtn.style.display = 'none';
+      const snapCard = $('#plan-snapshot-card');
+
+      if (planCache.planId) {
+        $('#plan-exec-summary').value = planCache.executiveSummary || '';
+        $('#plan-impl-notes').value = planCache.implementationNotes || '';
+        $('#plan-version-label').textContent = planCache.planVersion || 1;
+        $('#plan-snapshot-viewer').textContent = JSON.stringify(planCache.snapshot, null, 2);
+        snapCard.style.display = 'block';
+        if (expBtn) expBtn.style.display = 'inline-flex';
+        if (genBtn) genBtn.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg> Regenerate Artifact 12 — Comprehensive Plan`;
+      } else {
+        snapCard.style.display = 'none';
+        if (expBtn) expBtn.style.display = 'none';
+        if (genBtn) genBtn.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg> Generate Artifact 12 — Comprehensive Plan`;
+      }
+      if (genBtn) genBtn.disabled = !(planCache.prerequisites && planCache.prerequisites.canGenerate);
+    } catch (err) {
+      NF.toast(err.message || 'Could not reach the server.', 'error');
     }
+  }
+
+  function renderPlanAvailability(prereq) {
+    if (!prereq) {
+      $('#plan-availability').innerHTML = '';
+      return;
+    }
+    const rows = [
+      ['profile', 'Client Profile'], ['goals', 'Goal Map'], ['riskAssessment', 'Risk Assessment'],
+      ['financials', 'Financial Snapshot'], ['allocation', 'Strategic Allocation'], ['products', 'Product Recommendations']
+    ];
+    let html = rows.map(([key, label]) => {
+      const ok = !!prereq[key];
+      return `<div class="plan-check ${ok ? 'ok' : 'missing'}">${ok ? '✓' : '✗'} ${label}${ok ? '' : ' — NOT YET RECORDED'}</div>`;
+    }).join('');
+
+    const ar = prereq.analystReports || {};
+    const arRows = [['netWorth', 'Net Worth'], ['insurance', 'Insurance'], ['tax', 'Tax'], ['retirementPlanning', 'Retirement'], ['goalGaps', 'Goal Gaps']];
+    html += `<div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border-subtle)">`;
+    html += arRows.map(([key, label]) => {
+      const ok = !!ar[key];
+      return `<div class="plan-check ${ok ? 'ok' : 'missing'}" style="font-size:.75rem">${ok ? '✓' : '○'} Analyst Report — ${label}${ok ? '' : ' (optional, not generated)'}</div>`;
+    }).join('');
+    html += `</div>`;
+
+    html += `<div class="plan-check ${prereq.canGenerate ? 'ok' : 'missing'}" style="margin-top:10px;border-top:1px solid var(--border-subtle);padding-top:10px;font-weight:700">
+      ${prereq.canGenerate ? '✓ All blocking prerequisites met — ready to generate' : '✗ Complete the missing items above before generating'}
+    </div>`;
 
     $('#plan-availability').innerHTML = html;
   }
 
+  function setupFullPlanForm() {
+    const btn = $('#btn-gen-12');
+    if (!btn) return;
+    btn.addEventListener('click', async () => {
+      const onboardingId = NF.getActiveClientId();
+      if (!onboardingId) return;
+      const executiveSummary = $('#plan-exec-summary').value.trim();
+      if (!executiveSummary) {
+        NF.toast('Executive summary is required.', 'error');
+        return;
+      }
+
+      const payload = { executiveSummary, implementationNotes: $('#plan-impl-notes').value.trim() || null };
+      btn.disabled = true;
+      try {
+        const res = await fetch(`${API_BASE}/api/customers/${onboardingId}/research/plan`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        if (!res.ok) {
+          const body = await res.json().catch(() => ({}));
+          throw new Error(body.message || 'Failed to generate plan.');
+        }
+        planCache = await res.json();
+        NF.toast(`Comprehensive Plan generated (v${planCache.planVersion}).`, 'success');
+        renderFullPlanView(onboardingId);
+      } catch (err) {
+        NF.toast(err.message || 'Could not reach the server.', 'error');
+      } finally {
+        btn.disabled = false;
+      }
+    });
+  }
+
+  function exportPlan() {
+    if (!planCache || !planCache.planId) {
+      NF.toast('No plan to export yet.', 'error');
+      return;
+    }
+    const printWin = window.open('', '_blank');
+    printWin.document.write(`
+      <html><head><title>NeuroFi Comprehensive Plan</title>
+      <style>body{font-family:Georgia,serif;padding:40px;color:#111}h1{font-size:22px}h2{font-size:16px;margin-top:24px}pre{white-space:pre-wrap;font-family:monospace;font-size:11px;background:#f5f5f5;padding:12px;border-radius:6px}</style>
+      </head><body>
+      <h1>NeuroFi Comprehensive Financial Plan</h1>
+      <p><strong>Onboarding #${planCache.onboardingId}</strong> · Version ${planCache.planVersion} · ${planCache.status}</p>
+      <h2>Executive Summary</h2><p>${escapeHtml(planCache.executiveSummary || '').replace(/\n/g, '<br/>')}</p>
+      <h2>Implementation Notes</h2><p>${escapeHtml(planCache.implementationNotes || '').replace(/\n/g, '<br/>')}</p>
+      <h2>Plan Snapshot</h2><pre>${escapeHtml(JSON.stringify(planCache.snapshot, null, 2))}</pre>
+      <p style="margin-top:40px;font-size:11px;color:#888">NeuroFi Fiduciary Intelligence System · Compliance Vault</p>
+      </body></html>
+    `);
+    printWin.document.close();
+    setTimeout(() => printWin.print(), 250);
+  }
+
+  window.RE = { exportPlan };
+
   // ═══════════════════════════════════════════
   //  VIEW: GATE 3
   // ═══════════════════════════════════════════
-  function renderGate3(client) {
-    const g3passed = NF.isGatePassed(client.id, 3);
+  async function renderGate3(onboardingId) {
+    let gate3Passed = false;
+    try {
+      const res = await fetch(`${API_BASE}/api/customers/${onboardingId}/gates`);
+      if (res.ok) {
+        const data = await res.json();
+        const g3 = (data.gates || []).find(g => g.gateNumber === 3);
+        gate3Passed = !!(g3 && g3.passed);
+      }
+    } catch {
+      gate3Passed = false;
+    }
+
     const checkLabels = [
       'Asset allocation matches risk category',
       'All products are Direct plans only',
@@ -451,27 +937,23 @@
       'Goal-horizon bucketing is correct'
     ];
 
-    let html = `<div class="gate-card ${g3passed ? 'passed' : 'active'}">
+    let html = `<div class="gate-card ${gate3Passed ? 'passed' : 'active'}">
       <div class="gate-hdr">
-        <div class="gate-num ${g3passed ? 'ok' : 'pending'}">3</div>
+        <div class="gate-num ${gate3Passed ? 'ok' : 'pending'}">3</div>
         <div>
           <div class="gate-title">Gate 3 — Strategic Review</div>
-          <div class="gate-sub">${g3passed ? 'Approved — ' + NF.fmtDate((client.gateTimestamps || {})[3]) : 'Pending approval by Researcher'}</div>
+          <div class="gate-sub">${gate3Passed ? 'Approved' : 'Pending approval by Researcher'}</div>
         </div>
       </div>
       <ul class="gate-checks">`;
 
     checkLabels.forEach((label, i) => {
-      const on = g3passed || gate3Checks[i];
-      html += `<li>
-        <div class="chk-box ${on ? 'on' : ''}" id="g3-chk-${i}" ${!g3passed ? `onclick="toggleGate3Check(${i})"` : ''}></div>
-        ${label}
-      </li>`;
+      const on = gate3Passed || gate3Checks[i];
+      html += `<li><div class="chk-box ${on ? 'on' : ''}" id="g3-chk-${i}" ${!gate3Passed ? `onclick="toggleGate3Check(${i})"` : ''}></div>${label}</li>`;
     });
-
     html += `</ul>`;
 
-    if (!g3passed) {
+    if (!gate3Passed) {
       const allChecked = gate3Checks.every(Boolean);
       html += `<div class="form-actions" style="margin-top:16px">
         <button class="btn btn-success btn-lg" id="btn-approve-gate3" ${allChecked ? '' : 'disabled'}>
@@ -484,38 +966,39 @@
         ✓ Gate 3 has been approved. The plan has been released to the RM for client delivery.
       </div>`;
     }
-
     html += `</div>`;
 
-    // Prerequisite checks
-    const art10 = NF.getArtifact(client.id, '10', 'researcher');
-    const art11 = NF.getArtifact(client.id, '11', 'researcher');
-    const art12 = NF.getArtifact(client.id, '12', 'researcher');
-    if (!art10 || !art11 || !art12) {
+    const hasAlloc = !!allocationCache;
+    const hasProducts = !!productsCache;
+    const hasPlan = !!(planCache && planCache.planId);
+    if (!hasAlloc || !hasProducts || !hasPlan) {
       html += `<div class="card" style="border-color:rgba(245,158,11,.3)">
-        <h3 style="color:var(--accent-amber)">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--accent-amber)" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
-          Prerequisites Missing
-        </h3>
+        <h3 style="color:var(--accent-amber)">Prerequisites Missing</h3>
         <div style="font-size:.82rem;color:var(--text-secondary);line-height:1.6">
-          ${!art10 ? '<div style="color:var(--accent-red)">✗ Artifact 10 (Asset Allocation) — not generated</div>' : '<div style="color:var(--accent-green)">✓ Artifact 10 (Asset Allocation) — generated</div>'}
-          ${!art11 ? '<div style="color:var(--accent-red)">✗ Artifact 11 (Product Recommendations) — not generated</div>' : '<div style="color:var(--accent-green)">✓ Artifact 11 (Product Recommendations) — generated</div>'}
-          ${!art12 ? '<div style="color:var(--accent-red)">✗ Artifact 12 (Comprehensive Plan) — not generated</div>' : '<div style="color:var(--accent-green)">✓ Artifact 12 (Comprehensive Plan) — generated</div>'}
-          <p style="margin-top:10px;color:var(--text-muted);font-style:italic">All three Researcher artifacts should be generated before approving Gate 3.</p>
+          ${!hasAlloc ? '<div style="color:var(--accent-red)">✗ Strategic Allocation — not saved</div>' : '<div style="color:var(--accent-green)">✓ Strategic Allocation — saved</div>'}
+          ${!hasProducts ? '<div style="color:var(--accent-red)">✗ Product Recommendations — not saved</div>' : '<div style="color:var(--accent-green)">✓ Product Recommendations — saved</div>'}
+          ${!hasPlan ? '<div style="color:var(--accent-red)">✗ Comprehensive Plan — not generated</div>' : '<div style="color:var(--accent-green)">✓ Comprehensive Plan — generated</div>'}
+          <p style="margin-top:10px;color:var(--text-muted);font-style:italic">Visit the Allocation, Products and Full Plan tabs first if any of these are missing.</p>
         </div>
       </div>`;
     }
 
     $('#gate3-content').innerHTML = html;
 
-    // Bind approve button
     const approveBtn = $('#btn-approve-gate3');
     if (approveBtn) {
-      approveBtn.addEventListener('click', () => {
-        NF.passGate(client.id, 3);
-        gate3Checks = [true, true, true, true];
-        NF.toast('Gate 3 approved — Plan released to RM Phase 2', 'success');
-        renderGate3(NF.getClient(client.id));
+      approveBtn.addEventListener('click', async () => {
+        try {
+          const res = await fetch(`${API_BASE}/api/customers/${onboardingId}/gates/3`, { method: 'PUT' });
+          if (!res.ok) {
+            const body = await res.json().catch(() => ({}));
+            throw new Error(body.message || 'Failed to approve Gate 3.');
+          }
+          NF.toast('Gate 3 approved — Plan released to RM Phase 2', 'success');
+          renderGate3(onboardingId);
+        } catch (err) {
+          NF.toast(err.message || 'Could not reach the server.', 'error');
+        }
       });
     }
   }
@@ -528,537 +1011,23 @@
     if (btn) btn.disabled = !gate3Checks.every(Boolean);
   };
 
-  // ═══════════════════════════════════════════
-  //  ARTIFACT GENERATION
-  // ═══════════════════════════════════════════
-
-  function generateArtifact10() {
-    const client = getActiveClient();
-    if (!client) return;
-    const score = client.riskScore || 0;
-    const catData = NF.scoreToCategory(score);
-    const goals = getClientGoals(client);
-    const ts = new Date().toISOString();
-
-    let md = `# Artifact 10 — Asset Allocation\n`;
-    md += `**Generated:** ${NF.fmtDate(ts)} | **Client:** ${client.id}\n`;
-    md += `---\n\n`;
-
-    md += `## Risk Assessment Summary\n`;
-    md += `| Field | Value |\n|---|---|\n`;
-    md += `| Risk Score | ${score} / 100 |\n`;
-    md += `| Risk Category | ${catData.cat} |\n`;
-    md += `| Assessment Method | ${NF.RISK_QUESTIONS.length}-Question Scored Questionnaire |\n\n`;
-
-    md += `## Strategic Asset Allocation\n`;
-    md += `| Asset Class | Allocation | Rationale |\n|---|---|---|\n`;
-    md += `| Equity | ${catData.eq}% | Growth engine — diversified across large, mid, and flexi cap |\n`;
-    md += `| Debt | ${catData.debt}% | Capital preservation and income — AAA/AA+ rated instruments |\n`;
-    md += `| Gold | ${catData.gold}% | Portfolio hedge against currency risk and geopolitical uncertainty |\n\n`;
-
-    if (goals.length > 0) {
-      md += `## Goal-Horizon Bucketing\n`;
-      md += `| Goal | Target Amount | Horizon | Bucket | Equity | Debt | Gold |\n|---|---|---|---|---|---|---|\n`;
-      goals.forEach(g => {
-        const horizon = g.horizon || g.timeframe || 0;
-        let bucket, eq, debt, gold;
-        if (horizon < 3) {
-          bucket = 'Short-term (< 3y)'; eq = 0; debt = 100; gold = 0;
-        } else if (horizon <= 7) {
-          bucket = 'Medium-term (3-7y)'; eq = 40; debt = 50; gold = 10;
-        } else {
-          bucket = 'Long-term (> 7y)'; eq = catData.eq; debt = catData.debt; gold = catData.gold;
-        }
-        const amt = g.targetAmount || g.futureValue || g.amount || 0;
-        md += `| ${g.name || g.goal || '—'} | ${NF.fmt(amt)} | ${horizon} yrs | ${bucket} | ${eq}% | ${debt}% | ${gold}% |\n`;
-      });
-      md += `\n`;
-    }
-
-    md += `## Allocation Principles\n`;
-    md += `1. **Horizon-based bucketing** — Short-term goals (<3 years) receive 100% debt allocation to protect capital\n`;
-    md += `2. **Medium-term goals** (3-7 years) use a balanced 40/50/10 split regardless of risk category\n`;
-    md += `3. **Long-term goals** (>7 years) use the full risk-category allocation to maximize compounding\n`;
-    md += `4. **Rebalancing** — Annual rebalancing when any asset class deviates by more than 5% from target\n`;
-    md += `5. **Direct plans only** — All mutual fund investments via direct plans to minimize expense drag\n`;
-
-    NF.setArtifact(client.id, '10', md, 'researcher');
-    NF.toast('Artifact 10 — Asset Allocation generated successfully', 'success');
-    renderAllocation(NF.getClient(client.id));
-  }
-
-  function generateArtifact11() {
-    const client = getActiveClient();
-    if (!client) return;
-    const score = client.riskScore || 0;
-    const catData = NF.scoreToCategory(score);
-    const ts = new Date().toISOString();
-    const goals = getClientGoals(client);
-
-    // Determine tax regime from analysis or default
-    let taxRegime = 'New Regime';
-    if (client.analysis && client.analysis.tax) {
-      taxRegime = client.analysis.tax.recommendation || 'New Regime';
-    }
-
-    // Build goal summary for context
-    const goalSummary = goals.map(g => `${g.name || g.goal} (${g.horizon || 0}y)`).join(', ') || 'No goals mapped';
-
-    // Collect rationales from textareas (user-edited overrides)
-    const rationales = PRODUCTS.map((p, i) => {
-      const ta = $(`#rationale-${i}`);
-      return ta ? ta.value : p.rationale;
-    });
-
-    let md = `# Artifact 11 — Product Recommendations\n`;
-    md += `**Generated:** ${NF.fmtDate(ts)} | **Client:** ${client.id}\n`;
-    md += `---\n\n`;
-
-    md += `## Client Risk Profile: ${catData.cat} (Score: ${score}/100)\n`;
-    md += `**Target Allocation:** Equity ${catData.eq}% · Debt ${catData.debt}% · Gold ${catData.gold}%\n`;
-    md += `**Recommended Tax Regime:** ${taxRegime}\n`;
-    md += `**Mapped Goals:** ${goalSummary}\n\n`;
-
-    md += `## Recommended Product Universe\n\n`;
-    md += `> All products listed are **Direct Plans** only, in compliance with SEBI RIA regulations.\n`;
-    md += `> No commissions, trailing fees, or revenue-sharing arrangements exist with any AMC.\n\n`;
-
-    md += `| # | Category | Fund | Expense Ratio |\n|---|---|---|---|\n`;
-    PRODUCTS.forEach((p, i) => {
-      md += `| ${i + 1} | ${p.cat} | ${p.fund} | ${p.er} |\n`;
-    });
-    md += `\n`;
-
-    md += `## Suitability Rationale (per SEBI Reg 17)\n\n`;
-    md += `> Each rationale is client-specific, referencing **${client.profile.fname} ${client.profile.lname}** (${client.id}), Risk Score **${score}/100** (${catData.cat}), Tax Regime: **${taxRegime}**.\n\n`;
-
-    PRODUCTS.forEach((p, i) => {
-      md += `### ${i + 1}. ${p.fund}\n`;
-      md += `**Category:** ${p.cat} | **Expense Ratio:** ${p.er}\n\n`;
-      // Inject client-specific context wrapper around user-provided rationale
-      md += `**Risk Profile Match:** Client ${client.id} scores ${score}/100 (${catData.cat}), targeting ${catData.eq}% equity / ${catData.debt}% debt / ${catData.gold}% gold. `;
-      if (p.cat.includes('Equity')) {
-        md += `This equity product aligns with the ${catData.eq}% equity allocation band.\n\n`;
-      } else if (p.cat.includes('Debt') || p.cat.includes('Liquid')) {
-        md += `This debt product aligns with the ${catData.debt}% debt allocation band.\n\n`;
-      } else if (p.cat.includes('Gold')) {
-        md += `This gold product aligns with the ${catData.gold}% defensive gold allocation band.\n\n`;
-      } else if (p.cat.includes('NPS')) {
-        md += `NPS provides additional Section 80CCD(1B) tax efficiency under the ${taxRegime}.\n\n`;
-      }
-      md += `**Product Rationale:** ${rationales[i]}\n\n`;
-    });
-
-    md += `## Important Disclosures\n`;
-    md += `- Past performance does not guarantee future returns\n`;
-    md += `- Mutual fund investments are subject to market risks\n`;
-    md += `- All recommendations are Direct Plans — no commission is earned by the adviser\n`;
-    md += `- Product selection is based on quantitative screening and fiduciary suitability analysis\n`;
-    md += `- The adviser is SEBI Registered (RIA) and operates under a fee-only model\n`;
-
-    NF.setArtifact(client.id, '11', md, 'researcher');
-    NF.toast('Artifact 11 — Product Recommendations generated successfully', 'success');
-    renderProducts(NF.getClient(client.id));
-  }
-
-  function generateArtifact12() {
-    const client = getActiveClient();
-    if (!client) return;
-    const ts = new Date().toISOString();
-    const execSummary = ($('#plan-exec-summary') || {}).value || '';
-    const implNotes = ($('#plan-impl-notes') || {}).value || '';
-
-    let md = `# Artifact 12 — Comprehensive Financial Plan\n`;
-    md += `**Generated:** ${NF.fmtDate(ts)} | **Client:** ${client.id}\n`;
-    md += `**Classification:** Confidential — For Client Use Only\n`;
-    md += `---\n\n`;
-
-    // Section 1: Executive Summary
-    md += `## 1. Executive Summary\n\n`;
-    if (execSummary.trim()) {
-      md += `${execSummary.trim()}\n\n`;
-    } else {
-      md += `This comprehensive financial plan has been prepared for Client ${client.id} to achieve their stated financial goals through a disciplined, risk-appropriate investment strategy aligned with SEBI regulatory requirements.\n\n`;
-    }
-
-    // Section 2: Risk Assessment (Artifact 02)
-    md += `## 2. Risk Assessment\n\n`;
-    const art02 = NF.getArtifact(client.id, '02', 'researcher');
-    if (art02) {
-      md += `*Source: Artifact 02 — Risk Profile*\n\n`;
-      md += art02.content.split('\n').filter(l => !l.startsWith('# ')).join('\n') + '\n\n';
-    } else {
-      md += `*Artifact 02 (Risk Profile) is not yet available.*\n\n`;
-    }
-
-    // Section 3: Goal Analysis (Artifact 07)
-    md += `## 3. Goal Gap Analysis\n\n`;
-    const art07 = NF.getArtifact(client.id, '07', 'researcher');
-    if (art07) {
-      md += `*Source: Artifact 07 — Goal Gap Analysis*\n\n`;
-      md += art07.content.split('\n').filter(l => !l.startsWith('# ')).join('\n') + '\n\n';
-    } else {
-      md += `*Artifact 07 (Goal Gap Analysis) is not yet available.*\n\n`;
-    }
-
-    // Section 4: Tax Strategy (Artifact 08)
-    md += `## 4. Tax Optimization Strategy\n\n`;
-    const art08 = NF.getArtifact(client.id, '08', 'researcher');
-    if (art08) {
-      md += `*Source: Artifact 08 — Tax Optimization*\n\n`;
-      md += art08.content.split('\n').filter(l => !l.startsWith('# ')).join('\n') + '\n\n';
-    } else {
-      md += `*Artifact 08 (Tax Optimization) is not yet available.*\n\n`;
-    }
-
-    // Section 5: Retirement Plan (Artifact 09)
-    md += `## 5. Retirement Analysis\n\n`;
-    const art09 = NF.getArtifact(client.id, '09', 'researcher');
-    if (art09) {
-      md += `*Source: Artifact 09 — Retirement Analysis*\n\n`;
-      md += art09.content.split('\n').filter(l => !l.startsWith('# ')).join('\n') + '\n\n';
-    } else {
-      md += `*Artifact 09 (Retirement Analysis) is not yet available.*\n\n`;
-    }
-
-    // Section 6: Strategic Allocation (Artifact 10)
-    md += `## 6. Strategic Asset Allocation\n\n`;
-    const art10 = NF.getArtifact(client.id, '10', 'researcher');
-    if (art10) {
-      md += `*Source: Artifact 10 — Asset Allocation*\n\n`;
-      md += art10.content.split('\n').filter(l => !l.startsWith('# ')).join('\n') + '\n\n';
-    } else {
-      md += `*Artifact 10 (Asset Allocation) has not been generated yet.*\n\n`;
-    }
-
-    // Section 7: Product Recommendations (Artifact 11)
-    md += `## 7. Product Recommendations\n\n`;
-    const art11 = NF.getArtifact(client.id, '11', 'researcher');
-    if (art11) {
-      md += `*Source: Artifact 11 — Product Recommendations*\n\n`;
-      md += art11.content.split('\n').filter(l => !l.startsWith('# ')).join('\n') + '\n\n';
-    } else {
-      md += `*Artifact 11 (Product Recommendations) has not been generated yet.*\n\n`;
-    }
-
-    // Section 8: Implementation Notes
-    md += `## 8. Implementation Notes\n\n`;
-    if (implNotes.trim()) {
-      md += `${implNotes.trim()}\n\n`;
-    } else {
-      md += `Detailed implementation steps to be provided during client delivery (Artifact 13).\n\n`;
-    }
-
-    // Section 9: Disclaimers
-    md += `## 9. Disclaimers & Disclosures\n\n`;
-    md += `1. This plan is prepared by a SEBI Registered Investment Adviser operating under a fee-only model.\n`;
-    md += `2. No commissions, trailing fees, or revenue-sharing arrangements exist with any product manufacturer.\n`;
-    md += `3. All mutual fund recommendations are Direct Plans only.\n`;
-    md += `4. Past performance of any investment product does not guarantee future returns.\n`;
-    md += `5. Mutual fund investments are subject to market risks. Please read all scheme-related documents carefully.\n`;
-    md += `6. The projections and estimates in this plan are based on historical data and assumed growth rates. Actual returns may vary.\n`;
-    md += `7. This plan should be reviewed annually or upon any material change in the client's financial circumstances.\n`;
-    md += `8. Tax laws are subject to change. Tax calculations are based on FY 2025-26 rules.\n`;
-    md += `9. The adviser recommends consulting a qualified tax professional for specific tax advice.\n`;
-    md += `10. This document is confidential and intended solely for the named client.\n\n`;
-
-    md += `---\n`;
-    md += `*Plan compiled on ${NF.fmtDate(ts)} by NeuroFi Researcher Agent*\n`;
-    md += `*© NeuroFi FP&WM Intelligence System — All rights reserved*\n`;
-
-    NF.setArtifact(client.id, '12', md, 'researcher');
-    NF.toast('Artifact 12 — Comprehensive Plan generated successfully', 'success');
-    renderFullPlan(NF.getClient(client.id));
-  }
-
   // ── HTML Escaping ──
   function escapeHtml(str) {
     const div = document.createElement('div');
-    div.textContent = str;
+    div.textContent = str == null ? '' : str;
     return div.innerHTML;
   }
-
-  // ── Markdown to HTML Simple Parser for PDF Print ──
-  function markdownToHtml(md) {
-    if (!md) return '';
-    let html = md;
-    
-    // Escape HTML first to prevent any script injection
-    html = html
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;');
-      
-    // Headings
-    html = html.replace(/^#\s+(.+)$/gm, '<h1>$1</h1>');
-    html = html.replace(/^##\s+(.+)$/gm, '<h2>$1</h2>');
-    html = html.replace(/^###\s+(.+)$/gm, '<h3>$1</h3>');
-    
-    // Bold / Strong
-    html = html.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
-    // Italics
-    html = html.replace(/\*([^*]+)\*/g, '<em>$1</em>');
-    
-    // Quotes / Blocks
-    html = html.replace(/^>\s+(.+)$/gm, '<blockquote>$1</blockquote>');
-    
-    // Unordered lists
-    html = html.replace(/^\s*-\s+(.+)$/gm, '<li>$1</li>');
-    html = html.replace(/(<li>.+<\/li>)+/gs, '<ul>$&</ul>');
-    
-    // GFM Tables parsing
-    const lines = html.split('\n');
-    let inTable = false;
-    let tableHtml = '';
-    
-    for (let i = 0; i < lines.length; i++) {
-      const line = lines[i].trim();
-      if (line.startsWith('|') && line.endsWith('|')) {
-        const cells = line.split('|').map(c => c.trim()).filter((_, idx, arr) => idx > 0 && idx < arr.length - 1);
-        if (line.includes('---|') || line.includes('-:|') || line.includes(':-:')) {
-          continue;
-        }
-        if (!inTable) {
-          inTable = true;
-          tableHtml = '<table><thead><tr>' + cells.map(c => `<th>${c}</th>`).join('') + '</tr></thead><tbody>';
-        } else {
-          tableHtml += '<tr>' + cells.map(c => `<td>${c}</td>`).join('') + '</tr>';
-        }
-        lines[i] = '';
-      } else {
-        if (inTable) {
-          inTable = false;
-          tableHtml += '</tbody></table>';
-          lines[i] = tableHtml + '\n' + lines[i];
-          tableHtml = '';
-        }
-      }
-    }
-    
-    html = lines.filter(l => l !== '').join('\n');
-    
-    // Paragraphs
-    html = html.split('\n\n').map(p => {
-      if (p.trim().startsWith('<h') || p.trim().startsWith('<table') || p.trim().startsWith('<ul') || p.trim().startsWith('<blockquote')) {
-        return p;
-      }
-      return `<p>${p.replace(/\n/g, '<br/>')}</p>`;
-    }).join('\n');
-    
-    return html;
-  }
-
-  // ── PDF Export Function ──
-  function exportPlan() {
-    const client = getActiveClient();
-    if (!client) return;
-    
-    const art12 = NF.getArtifact(client.id, '12', 'researcher');
-    if (!art12) {
-      NF.toast('Artifact 12 has not been compiled yet.', 'error');
-      return;
-    }
-    
-    const printWin = window.open('', '_blank');
-    if (!printWin) {
-      NF.toast('Popup blocked! Please allow popups to print.', 'error');
-      return;
-    }
-    
-    const htmlContent = markdownToHtml(art12.content);
-    
-    printWin.document.write(`
-<!DOCTYPE html>
-<html>
-<head>
-  <title>NeuroFi Comprehensive Advisory Dossier — ${client.id}</title>
-  <style>
-    @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700;800&family=Inter:wght@400;500;600&display=swap');
-    
-    body {
-      font-family: 'Inter', sans-serif;
-      color: #0f172a;
-      line-height: 1.6;
-      padding: 40px;
-      max-width: 800px;
-      margin: 0 auto;
-      background: #ffffff;
-    }
-    
-    h1, h2, h3 {
-      font-family: 'Outfit', sans-serif;
-      color: #1e3a8a;
-      margin-top: 24px;
-      margin-bottom: 12px;
-      letter-spacing: -0.01em;
-    }
-    
-    h1 {
-      font-size: 2.2rem;
-      border-bottom: 2px solid #2563EB;
-      padding-bottom: 12px;
-      color: #1d4ed8;
-    }
-    
-    h2 {
-      font-size: 1.5rem;
-      border-bottom: 1px solid #e2e8f0;
-      padding-bottom: 8px;
-      margin-top: 36px;
-    }
-    
-    h3 {
-      font-size: 1.1rem;
-      color: #059669;
-    }
-    
-    p {
-      margin-bottom: 16px;
-      font-size: 0.95rem;
-      color: #334155;
-    }
-    
-    ul, ol {
-      margin-bottom: 16px;
-      padding-left: 20px;
-      font-size: 0.95rem;
-      color: #334155;
-    }
-    
-    li {
-      margin-bottom: 6px;
-    }
-    
-    blockquote {
-      background: #f8fafc;
-      border-left: 4px solid #7C3AED;
-      padding: 12px 18px;
-      margin: 18px 0;
-      font-style: italic;
-      color: #475569;
-    }
-    
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      margin: 20px 0;
-      font-size: 0.9rem;
-    }
-    
-    th, td {
-      border: 1px solid #e2e8f0;
-      padding: 10px 12px;
-      text-align: left;
-    }
-    
-    th {
-      background: #f1f5f9;
-      font-weight: 600;
-      color: #1e293b;
-    }
-    
-    tr:nth-child(even) {
-      background: #f8fafc;
-    }
-    
-    .header {
-      border-bottom: 3px double #cbd5e1;
-      margin-bottom: 32px;
-      padding-bottom: 16px;
-      display: flex;
-      justify-content: space-between;
-      align-items: flex-end;
-    }
-    
-    .header-logo {
-      font-family: 'Outfit', sans-serif;
-      font-weight: 900;
-      font-size: 2.2rem;
-      color: #1e3a8a;
-      letter-spacing: -0.03em;
-    }
-    
-    .header-logo span {
-      color: #7C3AED;
-    }
-    
-    .header-meta {
-      text-align: right;
-      font-size: 0.8rem;
-      color: #64748b;
-    }
-    
-    .footer {
-      margin-top: 56px;
-      font-size: 0.75rem;
-      color: #64748b;
-      border-top: 1px solid #e2e8f0;
-      padding-top: 14px;
-      text-align: center;
-      line-height: 1.5;
-    }
-    
-    @media print {
-      body {
-        padding: 0;
-      }
-      .no-print {
-        display: none;
-      }
-      @page {
-        margin: 20mm;
-      }
-    }
-  </style>
-</head>
-<body>
-  <div class="header">
-    <div>
-      <div class="header-logo">Neuro<span>Fi</span></div>
-      <div style="font-size:0.85rem;color:#475569;font-weight:600;margin-top:4px">Wealth Management Operating System</div>
-    </div>
-    <div class="header-meta">
-      <div><strong>CLIENT ID:</strong> ${client.id}</div>
-      <div><strong>DATE:</strong> ${new Date().toLocaleDateString('en-IN')}</div>
-      <div style="color:#059669;font-weight:600">SEBI RIA COMPLIANT</div>
-    </div>
-  </div>
-  
-  ${htmlContent}
-  
-  <div class="footer">
-    This document is confidential and prepared exclusively for the named client.<br/>
-    This constitutes the regulatory advisory output under SEBI Investment Advisers Regulations, 2013.<br/>
-    <strong>NeuroFi Fiduciary Intelligence System · 5-Year Compliance Vault Archival</strong>
-  </div>
-</body>
-</html>
-    `);
-    
-    printWin.document.close();
-    setTimeout(() => {
-      printWin.print();
-    }, 250);
-  }
-
-  // Expose global namespace RE for HTML click binding
-  window.RE = {
-    exportPlan
-  };
 
   // ═══════════════════════════════════════════
   //  INIT
   // ═══════════════════════════════════════════
   function init() {
     setupNav();
-    populateClientSelector();
-
-    // Bind generate buttons
-    $('#btn-gen-10').addEventListener('click', generateArtifact10);
-    $('#btn-gen-11').addEventListener('click', generateArtifact11);
-    $('#btn-gen-12').addEventListener('click', generateArtifact12);
-
-    refreshAll();
+    setupClientSearch();
+    setupAllocationForm();
+    setupProductsForm();
+    setupFullPlanForm();
+    applyAccessState();
   }
 
   // Boot

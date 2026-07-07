@@ -1,28 +1,29 @@
-export type Role = 'rm' | 'analyst' | 'researcher';
+export type ApiRole = 'RM' | 'ANALYST' | 'RESEARCHER' | 'ADMIN';
+export type PortalRole = 'rm' | 'analyst' | 'researcher';
 
-export interface NfUser {
+export interface AgentLoginResponse {
+  agentId: number;
   username: string;
-  password: string;
-  role: Role;
-  displayName: string;
+  role: ApiRole;
+  status: 'Active' | 'Inactive';
 }
 
-export const USERS: NfUser[] = [
-  { username: 'rm', password: 'rm12345', role: 'rm', displayName: 'Relationship Manager' },
-  { username: 'analyst', password: 'analyst12345', role: 'analyst', displayName: 'Financial Analyst' },
-  { username: 'researcher', password: 'researcher12345', role: 'researcher', displayName: 'Investment Strategist' },
-];
+export interface NfAuth {
+  agentId: number;
+  username: string;
+  role: PortalRole;
+}
 
-export const DASHBOARD_PATH: Record<Role, string> = {
+const DASHBOARD_PATH: Record<PortalRole, string> = {
   rm: '/dashboard/rm.html',
   analyst: '/dashboard/analyst.html',
   researcher: '/dashboard/researcher.html',
 };
 
-export function authenticate(username: string, password: string): NfUser | null {
-  return (
-    USERS.find(
-      (u) => u.username.toLowerCase() === username.trim().toLowerCase() && u.password === password,
-    ) || null
-  );
+export function dashboardPathForRole(role: ApiRole): string | null {
+  const portalRole = role.toLowerCase();
+  if (portalRole === 'rm' || portalRole === 'analyst' || portalRole === 'researcher') {
+    return DASHBOARD_PATH[portalRole];
+  }
+  return null;
 }

@@ -1,22 +1,47 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { authenticate, DASHBOARD_PATH } from '../../auth/users';
+import { agentLogin, AgentLoginError } from '../../auth/api';
+import { dashboardPathForRole } from '../../auth/users';
 import './Login.css';
 
 const Login: React.FC = () => {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const user = authenticate(username, password);
-    if (!user) {
-      setError('Invalid username or password.');
-      return;
+    setError('');
+    setIsSubmitting(true);
+
+    try {
+      const agent = await agentLogin(username.trim(), password);
+
+      const dashboardPath = dashboardPathForRole(agent.role);
+      if (!dashboardPath) {
+        setError(`No portal is configured for the "${agent.role}" role.`);
+        return;
+      }
+
+      localStorage.setItem(
+        'nf_auth',
+        JSON.stringify({
+          agentId: agent.agentId,
+          username: agent.username,
+          role: agent.role.toLowerCase(),
+        }),
+      );
+      window.location.href = dashboardPath;
+    } catch (err) {
+      if (err instanceof AgentLoginError) {
+        setError(err.message);
+      } else {
+        setError('Could not reach the server. Please try again.');
+      }
+    } finally {
+      setIsSubmitting(false);
     }
-    localStorage.setItem('nf_auth', JSON.stringify({ username: user.username, role: user.role }));
-    window.location.href = DASHBOARD_PATH[user.role];
   };
 
   return (
@@ -53,7 +78,9 @@ const Login: React.FC = () => {
 
           {error && <div className="login-error">{error}</div>}
 
-          <button type="submit" className="login-submit">Sign In</button>
+          <button type="submit" className="login-submit" disabled={isSubmitting}>
+            {isSubmitting ? 'Signing In…' : 'Sign In'}
+          </button>
         </form>
 
         <Link to="/" className="login-back">← Back to home</Link>

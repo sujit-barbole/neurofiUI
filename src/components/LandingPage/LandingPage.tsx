@@ -264,7 +264,7 @@ const LandingPage: React.FC = () => {
                 <polyline points="16 8 10 14 8 12"></polyline>
               </svg>
             </div>
-            <span className="trust-label sebi-label">SEBI Registered<br />Investment Advisory<br />Standard</span>
+            <span className="trust-label sebi-label">SEBI RIA Registration<br />Application In Process<br />(App No. 1670057)</span>
           </div>
           <div className="trust-item">
             <div className="trust-value-wrapper">
@@ -667,7 +667,7 @@ const LandingPage: React.FC = () => {
           </div>
           <div className="contact-details">
             <p className="cta-reassurance">No products to sell. No obligations. Just an honest assessment of where you stand.</p>
-            <p>advisory@neurofi.in | We respond within 4 hours.</p>
+            <p>staff@neurofi.com | We respond within 4 hours.</p>
             <p>+91 91136 62144</p>
             <p>1st Floor, Lakshmi Pura Layout, Devasandra, KR Puram, Bangalore – 560036</p>
           </div>
@@ -687,12 +687,15 @@ const LandingPage: React.FC = () => {
             <a href="#how-it-works">How It Works</a>
             <a href="#who-we-serve">Who We Serve</a>
             <a href="#fiduciary">Why NeuroFi</a>
+            <a href="/about-us.html">About Us</a>
+            <a href="/contact-us.html">Contact Us</a>
           </div>
           <div className="footer-links">
             <h4>Legal</h4>
-            <a href="#">Privacy Policy</a>
-            <a href="#">Terms of Service</a>
-            <a href="#">SEBI Investor Charter</a>
+            <a href="/privacy-policy.html">Privacy Policy</a>
+            <a href="/terms-conditions.html">Terms &amp; Conditions</a>
+            <a href="/refund-cancellation-policy.html">Refund &amp; Cancellation Policy</a>
+            <a href="https://www.sebi.gov.in/legal/circulars/jun-2025/investor-charter-for-investment-advisers_94354.html" target="_blank" rel="noopener">SEBI Investor Charter</a>
           </div>
           <div className="footer-social">
             <h4>Connect</h4>
@@ -701,9 +704,9 @@ const LandingPage: React.FC = () => {
           </div>
         </div>
         <div className="container footer-bottom">
-          <p className="footer-compliance">SEBI Registered Investment Advisor · Flat Fee Advisory · Zero Product Commissions · Strict Conflict of Interest Policy</p>
-          <p>&copy; 2026 NeuroFi Advisory. All rights reserved.</p>
-          <p className="disclaimer">Disclaimer: Investment in securities market is subject to market risks; there is no guaranteed or assured return. Past performance is not indicative of future results. NeuroFi provides advisory services based on structured analysis; investors must read all related documents carefully and assess their own risk appetite before making investment decisions. NeuroFi does not guarantee specific outcomes or returns. Registration granted by SEBI does not certify the correctness, completeness, or adequacy of the services provided. Fee schedules and full disclosures are available upon request at advisory@neurofi.in.</p>
+          <p className="footer-compliance">SEBI RIA Registration Application In Process (App No. 1670057) · Flat Fee Advisory · Zero Product Commissions · Strict Conflict of Interest Policy</p>
+          <p>&copy; 2026 NeuroFi Wealth Advisory. All rights reserved.</p>
+          <p className="disclaimer">Disclaimer: NeuroFi Wealth Advisory's application for registration as an Investment Adviser with SEBI (Application No. 1670057) is currently under process. NeuroFi does not yet hold SEBI Investment Adviser registration and is not currently authorized to render investment advisory services as a Registered Investment Adviser until such registration is granted. Investment in securities market is subject to market risks; there is no guaranteed or assured return. Past performance is not indicative of future results. Investors must read all related documents carefully and assess their own risk appetite before making investment decisions. NeuroFi does not guarantee specific outcomes or returns. Fee schedules and full disclosures are available upon request at staff@neurofi.com.</p>
         </div>
       </footer>
     </>

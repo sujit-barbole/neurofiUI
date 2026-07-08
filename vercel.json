@@ -6,6 +6,6 @@
   "devCommand": "npm run dev",
   "rewrites": [
     { "source": "/api/:path*", "destination": "http://3.7.19.25:8080/api/:path*" },
-    { "source": "/((?!dashboard|downloads).*)", "destination": "/index.html" }
+    { "source": "/((?!dashboard|downloads|about-us|contact-us|privacy-policy|terms-conditions|refund-cancellation-policy).*)", "destination": "/index.html" }
   ]
 }

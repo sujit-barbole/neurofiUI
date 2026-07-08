@@ -194,6 +194,25 @@ a {
     background-color: rgba(255, 255, 255, 0.05);
 }
 
+.btn-download-hero {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background-color: transparent;
+    color: var(--accent-gold);
+    border: 1px solid var(--accent-gold);
+    padding: 14px 24px;
+    font-size: 0.95rem;
+    font-weight: 500;
+    border-radius: 4px;
+    transition: all 0.2s;
+}
+
+.btn-download-hero:hover {
+    background-color: var(--accent-gold);
+    color: var(--text-dark);
+}
+
 .btn-nav-download {
     display: inline-flex;
     align-items: center;
